@@ -60,7 +60,7 @@
 
     <div id="app" v-cloak>
 
-        <!-- ================== AUTH VIEW ================== -->
+        <!-- ================== AUTH VIEW (Demo Login) ================== -->
         <div v-if="!user" class="min-h-screen flex items-center justify-center bg-slate-100 p-4 relative z-50">
             <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200">
                 <div class="bg-emerald-600 p-8 text-center text-white">
@@ -98,6 +98,7 @@
             
             <div v-if="isMobileMenuOpen" @click="isMobileMenuOpen = false" class="fixed inset-0 bg-slate-900/60 z-40 md:hidden backdrop-blur-sm transition-opacity"></div>
 
+            <!-- Sidebar -->
             <aside :class="['sidebar-bg flex flex-col transition-all duration-300 shadow-2xl border-r border-slate-800 z-50 fixed md:relative h-full top-0 left-0', isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0', isSidebarCollapsed ? 'md:w-20' : 'w-64']">
                 <div class="absolute inset-0 bg-slate-900/85 z-0"></div>
                 <div class="relative z-10 flex flex-col h-full">
@@ -121,6 +122,7 @@
                 </div>
             </aside>
 
+            <!-- Main Workspace -->
             <main v-show="!printDoc" class="flex-1 flex flex-col h-full overflow-hidden transition-all duration-300">
                 <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 shrink-0 z-10 shadow-sm">
                     <div class="flex items-center">
@@ -153,7 +155,7 @@
                                 <p class="text-emerald-100 text-sm">สร้างใบเสนอราคา ใบแจ้งหนี้ และรับชำระเงินได้อย่างรวดเร็ว</p>
                             </div>
                             <div class="relative z-10 w-full md:w-auto">
-                                <button @click="changeTab('documents'); openForm('QT');" class="w-full md:w-auto px-6 py-3 bg-white text-emerald-700 rounded-xl font-bold hover:bg-emerald-50 hover:scale-105 transition-all duration-200 shadow-md flex items-center justify-center">
+                                <button @click="changeTab('documents'); openDocForm('QT');" class="w-full md:w-auto px-6 py-3 bg-white text-emerald-700 rounded-xl font-bold hover:bg-emerald-50 hover:scale-105 transition-all duration-200 shadow-md flex items-center justify-center">
                                     <i class="fas fa-plus-circle text-xl mr-2"></i> สร้างเอกสารขายด่วน
                                 </button>
                             </div>
@@ -220,8 +222,8 @@
                                 </button>
                             </div>
                             <div class="flex space-x-2 w-full xl:w-auto shrink-0">
-                                <button @click="openForm('QT')" class="flex-1 xl:flex-none justify-center flex items-center px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-bold shadow-sm transition whitespace-nowrap"><i class="fas fa-plus mr-1 sm:mr-2"></i> สร้างใบเสนอราคา</button>
-                                <button @click="openForm('IV')" class="flex-1 xl:flex-none justify-center flex items-center px-4 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-bold shadow-sm transition whitespace-nowrap"><i class="fas fa-plus mr-1 sm:mr-2"></i> สร้างใบแจ้งหนี้</button>
+                                <button @click="openDocForm('QT')" class="flex-1 xl:flex-none justify-center flex items-center px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-bold shadow-sm transition whitespace-nowrap"><i class="fas fa-plus mr-1 sm:mr-2"></i> สร้างใบเสนอราคา</button>
+                                <button @click="openDocForm('IV')" class="flex-1 xl:flex-none justify-center flex items-center px-4 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-bold shadow-sm transition whitespace-nowrap"><i class="fas fa-plus mr-1 sm:mr-2"></i> สร้างใบแจ้งหนี้</button>
                             </div>
                         </div>
 
@@ -249,9 +251,9 @@
                                             </td>
                                             <td class="p-4 flex items-center justify-center space-x-2">
                                                 <button @click="setPrintDoc(doc)" title="ดูตัวอย่าง / พิมพ์" class="p-2 sm:p-1.5 text-slate-500 hover:text-emerald-600 bg-slate-100 hover:bg-emerald-50 rounded-lg transition"><i class="fas fa-print"></i></button>
-                                                <button @click="editForm(doc)" title="แก้ไข" class="p-2 sm:p-1.5 text-slate-500 hover:text-amber-600 bg-slate-100 hover:bg-amber-50 rounded-lg transition"><i class="fas fa-edit"></i></button>
-                                                <button v-if="doc.type === 'QT' && doc.status !== 'Invoiced'" @click="convertTo(doc, 'IV')" class="p-2 sm:p-1.5 text-slate-500 hover:text-teal-600 bg-slate-100 hover:bg-teal-50 rounded-lg text-xs font-bold transition flex items-center"><i class="fas fa-arrow-right sm:mr-1"></i> <span class="hidden sm:inline">IV</span></button>
-                                                <button v-if="doc.type === 'IV' && doc.status !== 'Paid'" @click="convertTo(doc, 'RE')" class="p-2 sm:p-1.5 text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg text-xs font-bold shadow-sm transition sm:px-2 flex items-center"><i class="fas fa-dollar-sign sm:mr-1"></i> <span class="hidden sm:inline">จ่าย</span></button>
+                                                <button @click="editDocForm(doc)" title="แก้ไข" class="p-2 sm:p-1.5 text-slate-500 hover:text-amber-600 bg-slate-100 hover:bg-amber-50 rounded-lg transition"><i class="fas fa-edit"></i></button>
+                                                <button v-if="doc.type === 'QT' && doc.status !== 'Invoiced'" @click="convertDocTo(doc, 'IV')" class="p-2 sm:p-1.5 text-slate-500 hover:text-teal-600 bg-slate-100 hover:bg-teal-50 rounded-lg text-xs font-bold transition flex items-center"><i class="fas fa-arrow-right sm:mr-1"></i> <span class="hidden sm:inline">IV</span></button>
+                                                <button v-if="doc.type === 'IV' && doc.status !== 'Paid'" @click="convertDocTo(doc, 'RE')" class="p-2 sm:p-1.5 text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg text-xs font-bold shadow-sm transition sm:px-2 flex items-center"><i class="fas fa-dollar-sign sm:mr-1"></i> <span class="hidden sm:inline">จ่าย</span></button>
                                             </td>
                                         </tr>
                                         <tr v-if="filteredDocs.length === 0"><td colspan="6" class="p-10 text-center text-slate-500">ไม่มีเอกสาร</td></tr>
@@ -302,7 +304,7 @@
                                             </td>
                                             <td class="p-4 flex items-center justify-center space-x-2">
                                                 <button @click="setPrintDoc(doc)" title="ดูตัวอย่าง / พิมพ์" class="p-2 sm:p-1.5 text-slate-500 hover:text-emerald-600 bg-slate-100 hover:bg-emerald-50 rounded-lg transition"><i class="fas fa-print"></i></button>
-                                                <button @click="viewForm(doc)" title="ดูรายละเอียด" class="p-2 sm:p-1.5 text-slate-500 hover:text-amber-600 bg-slate-100 hover:bg-amber-50 rounded-lg transition"><i class="fas fa-eye"></i></button>
+                                                <button @click="viewDocForm(doc)" title="ดูรายละเอียด" class="p-2 sm:p-1.5 text-slate-500 hover:text-amber-600 bg-slate-100 hover:bg-amber-50 rounded-lg transition"><i class="fas fa-eye"></i></button>
                                             </td>
                                         </tr>
                                         <tr v-if="filteredOldDocs.length === 0"><td colspan="6" class="p-10 text-center text-slate-500">ไม่พบเอกสาร</td></tr>
@@ -319,7 +321,7 @@
                             <button @click="isFormOpen = false" class="text-slate-400 hover:text-red-500 transition p-1"><i class="fas fa-times text-xl"></i></button>
                         </div>
 
-                        <form @submit.prevent="saveForm" class="p-4 sm:p-6">
+                        <form @submit.prevent="saveDocument" class="p-4 sm:p-6">
                             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
                                 <div class="sm:col-span-2 md:col-span-1">
                                     <label class="block text-sm font-semibold text-slate-700 mb-1">ลูกค้า</label>
@@ -470,6 +472,22 @@
                         </div>
                     </div>
 
+                    <div v-if="activeTab === 'employees'" class="space-y-4">
+                        <div class="bg-gradient-to-r from-emerald-800 to-emerald-600 rounded-2xl shadow-lg p-5 sm:p-6 text-white flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
+                            <i class="fas fa-user-shield absolute right-0 top-0 opacity-10 text-[100px] sm:text-[150px] -translate-y-8 translate-x-8"></i>
+                            <div class="relative z-10 text-center md:text-left"><h2 class="text-xl sm:text-2xl font-bold mb-1">จัดการพนักงาน</h2><p class="text-emerald-100 text-sm">สำหรับผู้ดูแลระบบ (Admin) เท่านั้น</p></div>
+                            <div class="relative z-10 w-full md:w-auto"><button @click="openEmployeeForm" class="w-full md:w-auto px-6 py-3 bg-white text-emerald-800 rounded-xl font-bold hover:bg-emerald-50 transition shadow-md flex items-center justify-center"><i class="fas fa-user-plus mr-2 text-xl"></i> เพิ่มพนักงาน</button></div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="overflow-x-auto w-full">
+                                <table class="w-full text-left text-sm min-w-[600px]">
+                                    <thead class="bg-slate-50 border-b border-slate-200"><tr><th class="p-4 text-slate-500 font-semibold whitespace-nowrap">ชื่อ-นามสกุล</th><th class="p-4 text-slate-500 font-semibold whitespace-nowrap">ชื่อผู้ใช้ (Username)</th><th class="p-4 text-slate-500 font-semibold text-center whitespace-nowrap">สิทธิ์</th><th class="p-4 text-slate-500 font-semibold text-center whitespace-nowrap">จัดการ</th></tr></thead>
+                                    <tbody><tr v-for="e in employees" :key="e.id" class="border-b border-slate-50 hover:bg-slate-50 transition"><td class="p-4 font-semibold text-slate-800 whitespace-nowrap">{{e.name}} <span v-if="e.id===user.id" class="text-xs font-normal text-blue-500 ml-1">(คุณ)</span></td><td class="p-4 text-slate-600 whitespace-nowrap">{{e.email}}</td><td class="p-4 text-center whitespace-nowrap"><span :class="['px-2 py-1 rounded text-xs font-bold', e.role==='admin'?'bg-purple-100 text-purple-700':'bg-slate-100 text-slate-600']">{{e.role==='admin'?'Admin':'พนักงาน'}}</span></td><td class="p-4 text-center whitespace-nowrap"><button v-if="e.id!==user.id" @click="deleteEmployee(e.id)" class="p-1.5 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition"><i class="fas fa-trash"></i></button></td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </main>
 
@@ -609,13 +627,26 @@
                 </div>
             </div>
 
+            <div v-if="isEmployeeModalOpen" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col">
+                    <div class="px-5 py-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl"><h3 class="font-bold text-lg text-emerald-800">เพิ่มพนักงาน</h3><button @click="isEmployeeModalOpen = false" class="text-slate-400 hover:text-red-500 p-1"><i class="fas fa-times text-xl"></i></button></div>
+                    <form @submit.prevent="saveEmployee" class="p-5 space-y-4">
+                        <div><label class="block text-sm mb-1">ชื่อ-นามสกุล</label><input type="text" v-model="employeeForm.name" class="w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-400" required></div>
+                        <div><label class="block text-sm mb-1">ชื่อผู้ใช้ (Username)</label><input type="text" v-model="employeeForm.email" class="w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-400" required></div>
+                        <div><label class="block text-sm mb-1">รหัสผ่าน (ขั้นต่ำ 4 ตัว)</label><input type="password" minLength="4" v-model="employeeForm.password" class="w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-400" required></div>
+                        <div><label class="block text-sm mb-1">ระดับสิทธิ์</label><select v-model="employeeForm.role" class="w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-400"><option value="employee">พนักงานทั่วไป</option><option value="admin">ผู้ดูแลระบบ (Admin)</option></select></div>
+                        <div class="flex justify-end gap-3 mt-4 pt-4 border-t"><button type="button" @click="isEmployeeModalOpen = false" class="px-5 py-2 border rounded-lg">ยกเลิก</button><button type="submit" class="px-5 py-2 bg-emerald-600 text-white rounded-lg font-bold">บันทึก</button></div>
+                    </form>
+                </div>
+            </div>
+
         </div>
     </div>
 
     <!-- ================== SCRIPT VUE 3 ================== -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyD5PoZ4QcAo7mBspIscnsO6cnUxGPyY7iQ",
@@ -645,6 +676,7 @@
                 const customers = ref([]);
                 const products = ref([]);
                 const documents = ref([]);
+                const employees = ref([]);
                 
                 // Form Docs
                 const isFormOpen = ref(false);
@@ -662,6 +694,9 @@
                 const isProductModalOpen = ref(false);
                 const productForm = ref({ id: '', code: '', name: '', price: 0 });
 
+                const isEmployeeModalOpen = ref(false);
+                const employeeForm = ref({ id: '', name: '', email: '', password: '', role: 'employee' });
+
                 // Dashboard
                 const selectedMonth = ref(new Date().toISOString().slice(0, 7));
                 const oldDocSearch = ref('');
@@ -675,9 +710,10 @@
 
                 const initDB = () => {
                     onSnapshot(doc(db, publicPath, 'settings', 'profile'), snap => { if(snap.exists()) company.value = snap.data(); });
-                    onSnapshot(collection(db, publicPath, 'customers'), snap => customers.value = snap.docs.map(d => ({id: d.id, ...d.data()})));
-                    onSnapshot(collection(db, publicPath, 'products'), snap => products.value = snap.docs.map(d => ({id: d.id, ...d.data()})));
-                    onSnapshot(collection(db, publicPath, 'documents'), snap => documents.value = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => b.id.localeCompare(a.id)));
+                    onSnapshot(collection(db, publicPath, 'customers'), snap => customers.value = snap.docs.map(d => ({...d.data(), id: d.id})));
+                    onSnapshot(collection(db, publicPath, 'products'), snap => products.value = snap.docs.map(d => ({...d.data(), id: d.id})));
+                    onSnapshot(collection(db, publicPath, 'documents'), snap => documents.value = snap.docs.map(d => ({...d.data(), id: d.id})).sort((a,b) => b.id.localeCompare(a.id)));
+                    onSnapshot(collection(db, publicPath, 'employees'), snap => employees.value = snap.docs.map(d => ({...d.data(), id: d.id})));
                 };
 
                 const handleLogin = () => {
@@ -698,18 +734,18 @@
                 };
 
                 const navItems = [
-                    { id: 'dashboard', label: 'ภาพรวมระบบ', icon: 'fa-chart-line' },
-                    { id: 'documents', label: 'จัดการเอกสารขาย', icon: 'fa-file-invoice-dollar' },
-                    { id: 'old_documents', label: 'เอกสารเก่า (Archive)', icon: 'fa-folder-open' },
-                    { id: 'customers', label: 'ฐานข้อมูลลูกค้า', icon: 'fa-users' },
-                    { id: 'products', label: 'จัดการสินค้าและบริการ', icon: 'fa-box' },
-                    { id: 'settings', label: 'ตั้งค่าระบบ', icon: 'fa-cog' }
+                    { id: 'dashboard', label: 'แดชบอร์ด', icon: 'fa-chart-line' },
+                    { id: 'documents', label: 'เอกสารขาย', icon: 'fa-file-invoice-dollar' },
+                    { id: 'old_documents', label: 'เอกสารเก่า', icon: 'fa-folder-open' },
+                    { id: 'customers', label: 'ลูกค้า', icon: 'fa-users' },
+                    { id: 'products', label: 'สินค้า', icon: 'fa-box' },
+                    { id: 'settings', label: 'ตั้งค่า', icon: 'fa-cog' }
                 ];
 
                 const changeTab = (t) => { activeTab.value = t; isFormOpen.value = false; isMobileMenuOpen.value = false; };
                 
                 // Computed
-                const formatNumber = (n) => Number(n||0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                const formatNumber = (n) => Number(n||0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                 const formatDate = (d) => d ? d.split('-').reverse().join('/') : '';
                 
                 const stats = computed(() => {
@@ -748,12 +784,12 @@
                 });
 
                 const getCustomer = (id) => customers.value.find(c => c.id === id) || {};
-                const getStatusStyle = (s) => ({ 'Pending': 'bg-amber-100 text-amber-700 border-amber-200', 'Invoiced': 'bg-teal-100 text-teal-700 border-teal-200', 'Unpaid': 'bg-orange-100 text-orange-700 border-orange-200', 'Paid': 'bg-emerald-100 text-emerald-700 border-emerald-200' }[s] || 'bg-slate-100');
+                const getStatusStyle = (s) => ({ 'Pending': 'bg-amber-100 text-amber-700 border-amber-200', 'Invoiced': 'bg-teal-100 text-teal-700 border-teal-200', 'Unpaid': 'bg-orange-100 text-orange-700 border-orange-200', 'Paid': 'bg-emerald-100 text-emerald-700 border-emerald-200' }[s] || 'bg-slate-100 text-slate-700 border-slate-200');
                 const getStatusText = (s) => ({ 'Pending': 'รอดำเนินการ', 'Invoiced': 'ออกบิลแล้ว', 'Unpaid': 'รอชำระเงิน', 'Paid': 'ชำระแล้ว' }[s] || s);
 
                 // Methods
                 const generateId = (t) => {
-                    const d = new Date().toISOString().slice(2, 7).replace('-','');
+                    const d = new Date().toISOString().slice(2, 7).replace(/-/g, '');
                     const c = documents.value.filter(x => x.type === t && x.id.includes(d)).length + 1;
                     return `${t}-${d}${c.toString().padStart(3, '0')}`;
                 };
@@ -772,14 +808,14 @@
                 const removeItem = (i) => formData.value.items.splice(i, 1);
                 const onProductSelect = (idx) => { const p = products.value.find(x => x.id === formData.value.items[idx].productId); if(p){ formData.value.items[idx].name = p.name; formData.value.items[idx].price = p.price; } };
 
-                // บันทึกและปิดหน้าต่างทันที (ทำงาน Background)
+                // ระบบบันทึกแบบรวดเร็ว กดแล้วปิดหน้าต่างทันที
                 const saveDocument = () => {
                     if(!formData.value.customerId) return Swal.fire('เตือน', 'เลือกลูกค้าด้วยครับ', 'warning');
                     if(formData.value.items.length === 0) return Swal.fire('เตือน', 'เพิ่มรายการด้วยครับ', 'warning');
 
                     const finalData = JSON.parse(JSON.stringify({ ...formData.value, ...calculatedTotals.value }));
                     
-                    isFormOpen.value = false;
+                    isFormOpen.value = false; // ปิดหน้าต่างทันที
                     
                     setDoc(doc(db, publicPath, 'documents', finalData.id), finalData).catch(e => console.error(e));
                     
@@ -799,15 +835,18 @@
                 const openCustomerForm = () => { customerForm.value = { id: '', name: '', address: '', taxId: '', phone: '', email: '' }; isCustomerModalOpen.value = true; };
                 const saveCustomer = () => {
                     const cid = 'C' + Date.now().toString().slice(-6);
-                    setDoc(doc(db, publicPath, 'customers', cid), customerForm.value).catch(e=>console.log(e));
-                    formData.value.customerId = cid; isCustomerModalOpen.value = false;
+                    const dataToSave = { ...customerForm.value, id: cid };
+                    setDoc(doc(db, publicPath, 'customers', cid), dataToSave).catch(e=>console.log(e));
+                    formData.value.customerId = cid; 
+                    isCustomerModalOpen.value = false;
                     Swal.fire({title: 'สำเร็จ', icon: 'success', timer: 1000, showConfirmButton: false});
                 };
                 
                 const openProductForm = () => { productForm.value = { id: '', code: '', name: '', price: 0 }; isProductModalOpen.value = true; };
                 const saveProduct = () => {
                     const pid = 'P' + Date.now().toString().slice(-6);
-                    setDoc(doc(db, publicPath, 'products', pid), productForm.value).catch(e=>console.log(e));
+                    const dataToSave = { ...productForm.value, id: pid };
+                    setDoc(doc(db, publicPath, 'products', pid), dataToSave).catch(e=>console.log(e));
                     isProductModalOpen.value = false;
                     Swal.fire({title: 'สำเร็จ', icon: 'success', timer: 1000, showConfirmButton: false});
                 };
@@ -829,6 +868,23 @@
                 };
                 const clearLogo = () => { company.value.logo = ''; };
 
+                const openEmployeeForm = () => { employeeForm.value = { id: '', name: '', email: '', password: '', role: 'employee' }; isEmployeeModalOpen.value = true; };
+                const saveEmployee = () => {
+                    if(employees.value.some(x => x.email === employeeForm.value.email)) {
+                        Swal.fire('ข้อผิดพลาด', 'อีเมล/Username นี้มีในระบบแล้ว', 'error'); return;
+                    }
+                    const eid = 'E' + Date.now().toString().slice(-6);
+                    setDoc(doc(db, publicPath, 'employees', eid), { ...employeeForm.value, id: eid, createdAt: new Date().toISOString() }).catch(e=>console.log(e));
+                    isEmployeeModalOpen.value = false;
+                    Swal.fire({title: 'สำเร็จ', icon: 'success', timer: 1000, showConfirmButton: false});
+                };
+                
+                const deleteEmployee = (id) => {
+                    Swal.fire({ title: 'ยืนยันการลบ?', icon: 'warning', showCancelButton: true, confirmButtonText: 'ลบทันที', confirmButtonColor: '#ef4444' }).then((r) => {
+                        if(r.isConfirmed) deleteDoc(doc(db, publicPath, 'employees', id)).catch(e=>console.log(e));
+                    });
+                };
+
                 const exportCSV = () => {
                     if (dashboardSales.value.length === 0) return alert('ไม่มีข้อมูล');
                     let csv = "\uFEFFวันที่,เลขที่เอกสาร,ลูกค้า,ยอดสุทธิ\n";
@@ -837,14 +893,14 @@
                 };
 
                 return {
-                    user, loginData, activeTab, isSidebarCollapsed, isMobileMenuOpen, company, customers, products, documents,
-                    isFormOpen, isEditMode, isViewOnly, formType, formData, docFilter, filteredDocs,
-                    stats, selectedMonth, dashboardSales, oldDocSearch, oldDocDateStart, oldDocDateEnd, filteredOldDocs, calculatedTotals,
+                    user, loginData, activeTab, isSidebarCollapsed, isMobileMenuOpen, company, customers, products, documents, employees,
+                    isFormOpen, isEditMode, isViewOnly, formType, formData, docFilter, printDoc,
+                    isCustomerModalOpen, customerForm, isProductModalOpen, productForm, isEmployeeModalOpen, employeeForm,
+                    selectedMonth, oldDocSearch, oldDocDateStart, oldDocDateEnd, stats, dashboardSales, filteredDocs, filteredOldDocs, calculatedTotals,
                     handleLogin, handleLogout, changeTab, formatNumber, formatDate, getCustomer,
                     openDocForm, editDocForm, convertDocTo, viewDocForm, addItem, removeItem, onProductSelect, saveDocument,
-                    getStatusStyle, getStatusText, printDoc, setPrintDoc, closePrint, triggerPrint, openPrintFromForm,
-                    isCustomerModalOpen, customerForm, openCustomerForm, saveCustomer,
-                    isProductModalOpen, productForm, openProductForm, saveProduct,
+                    getStatusStyle, getStatusText, setPrintDoc, closePrint, triggerPrint, openPrintFromForm,
+                    openCustomerForm, saveCustomer, openProductForm, saveProduct, openEmployeeForm, saveEmployee, deleteEmployee,
                     handleLogoUpload, clearLogo, saveSettings, exportCSV, navItems
                 };
             }
