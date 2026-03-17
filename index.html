@@ -73,21 +73,21 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อผู้ใช้</label>
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-user text-slate-400"></i></div>
-                            <input type="text" v-model="loginData.username" class="w-full pl-10 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition" required placeholder="admin">
+                            <input type="text" v-model="loginData.username" class="w-full pl-10 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition" required placeholder="ชื่อผู้ใช้">
                         </div>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">รหัสผ่าน</label>
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-lock text-slate-400"></i></div>
-                            <input type="password" v-model="loginData.password" class="w-full pl-10 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition" required placeholder="1234">
+                            <input type="password" v-model="loginData.password" class="w-full pl-10 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition" required placeholder="รหัสผ่าน">
                         </div>
                     </div>
                     <button type="submit" class="w-full bg-emerald-600 text-white font-bold rounded-lg px-4 py-3 hover:bg-emerald-700 transition shadow-md">
                         เข้าสู่ระบบ
                     </button>
                     <div class="text-center mt-4 pt-4 border-t border-slate-100">
-                        <p class="text-sm text-slate-500 font-medium">Demo Login: ชื่อผู้ใช้ <b>admin</b> | รหัส <b>1234</b></p>
+                        <p class="text-sm text-slate-500 font-medium">ค่าเริ่มต้น (หากยังไม่เปลี่ยน): <b>admin</b> | <b>1234</b></p>
                     </div>
                 </form>
             </div>
@@ -470,9 +470,34 @@
                             </div>
                             <div><label class="block text-sm font-semibold mb-1 text-slate-700">อีเมล</label><input type="email" v-model="company.email" class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition"></div>
                         </div>
-                    </div>
+                    </form>
 
-                    <div v-if="activeTab === 'employees'" class="space-y-4">
+                    <div class="mt-10 pt-6 border-t-4 border-slate-100">
+                        <form @submit.prevent="saveAdminAuth">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-slate-200 pb-4 gap-4">
+                                <h3 class="font-bold text-slate-800 text-lg sm:text-xl text-blue-800">เปลี่ยนชื่อผู้ใช้และรหัสผ่าน (Admin)</h3>
+                                <button type="submit" class="w-full sm:w-auto px-5 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md transition flex items-center justify-center">
+                                    <i class="fas fa-key mr-2"></i> บันทึกรหัสผ่าน
+                                </button>
+                            </div>
+                            <div class="space-y-5 bg-blue-50/50 p-5 sm:p-6 rounded-xl border border-blue-100">
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1 text-slate-700">ชื่อผู้ใช้ (Username)</label>
+                                    <input type="text" v-model="adminAuth.username" class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none transition" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1 text-slate-700">รหัสผ่านใหม่ (Password)</label>
+                                    <input type="text" v-model="adminAuth.password" class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none transition" required>
+                                </div>
+                                <div class="text-sm text-red-500 font-medium mt-2">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i> สำคัญ: โปรดจำชื่อผู้ใช้และรหัสผ่านใหม่ให้ดี หากลืมจะไม่สามารถเข้าสู่ระบบได้
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div v-if="activeTab === 'employees'" class="space-y-4">
                         <div class="bg-gradient-to-r from-emerald-800 to-emerald-600 rounded-2xl shadow-lg p-5 sm:p-6 text-white flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
                             <i class="fas fa-user-shield absolute right-0 top-0 opacity-10 text-[100px] sm:text-[150px] -translate-y-8 translate-x-8"></i>
                             <div class="relative z-10 text-center md:text-left"><h2 class="text-xl sm:text-2xl font-bold mb-1">จัดการพนักงาน</h2><p class="text-emerald-100 text-sm">สำหรับผู้ดูแลระบบ (Admin) เท่านั้น</p></div>
@@ -646,7 +671,8 @@
     <!-- ================== SCRIPT VUE 3 ================== -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyD5PoZ4QcAo7mBspIscnsO6cnUxGPyY7iQ",
@@ -687,6 +713,8 @@
                 const docFilter = ref('ALL');
                 const printDoc = ref(null);
 
+                const adminAuth = ref({ username: 'admin', password: '1234' });
+
                 // Form Modals
                 const isCustomerModalOpen = ref(false);
                 const customerForm = ref({ id: '', name: '', address: '', taxId: '', phone: '', email: '' });
@@ -710,20 +738,37 @@
 
                 const initDB = () => {
                     onSnapshot(doc(db, publicPath, 'settings', 'profile'), snap => { if(snap.exists()) company.value = snap.data(); });
+                    onSnapshot(doc(db, publicPath, 'settings', 'admin_auth'), snap => { if(snap.exists()) adminAuth.value = snap.data(); });
                     onSnapshot(collection(db, publicPath, 'customers'), snap => customers.value = snap.docs.map(d => ({...d.data(), id: d.id})));
                     onSnapshot(collection(db, publicPath, 'products'), snap => products.value = snap.docs.map(d => ({...d.data(), id: d.id})));
                     onSnapshot(collection(db, publicPath, 'documents'), snap => documents.value = snap.docs.map(d => ({...d.data(), id: d.id})).sort((a,b) => b.id.localeCompare(a.id)));
                     onSnapshot(collection(db, publicPath, 'employees'), snap => employees.value = snap.docs.map(d => ({...d.data(), id: d.id})));
                 };
 
-                const handleLogin = () => {
-                    if (loginData.value.username === 'admin' && loginData.value.password === '1234') {
+                const handleLogin = async () => {
+                    let validUser = 'admin';
+                    let validPass = '1234';
+
+                    Swal.fire({ title: 'กำลังตรวจสอบ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+                    try {
+                        const authDoc = await getDoc(doc(db, publicPath, 'settings', 'admin_auth'));
+                        if (authDoc.exists()) {
+                            validUser = authDoc.data().username;
+                            validPass = authDoc.data().password;
+                        }
+                    } catch (e) {
+                        console.error("Fetch auth error", e);
+                    }
+
+                    if (loginData.value.username === validUser && loginData.value.password === validPass) {
                         const u = { id: 'admin', name: 'ผู้ดูแลระบบ', role: 'admin' };
                         localStorage.setItem('cdz_user', JSON.stringify(u));
                         user.value = u;
                         initDB();
+                        Swal.close();
                     } else {
-                        Swal.fire('ผิดพลาด', 'รหัสผ่านไม่ถูกต้อง (ใช้ admin / 1234)', 'error');
+                        Swal.fire('ผิดพลาด', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', 'error');
                     }
                 };
 
@@ -856,6 +901,17 @@
                     Swal.fire({title: 'สำเร็จ', text: 'บันทึกเรียบร้อย', icon: 'success', timer: 1000, showConfirmButton: false});
                 };
 
+                const saveAdminAuth = () => {
+                    if (!adminAuth.value.username || !adminAuth.value.password) {
+                        return Swal.fire('ผิดพลาด', 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน', 'warning');
+                    }
+                    setDoc(doc(db, publicPath, 'settings', 'admin_auth'), adminAuth.value).then(() => {
+                        Swal.fire({title: 'สำเร็จ', text: 'เปลี่ยนชื่อผู้ใช้และรหัสผ่านแล้ว', icon: 'success', timer: 1500, showConfirmButton: false});
+                    }).catch(e => {
+                        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถบันทึกรหัสผ่านได้', 'error');
+                    });
+                };
+
                 const handleLogoUpload = (e) => {
                     const f = e.target.files[0]; if(!f) return; const r = new FileReader();
                     r.onload = ev => {
@@ -894,14 +950,14 @@
 
                 return {
                     user, loginData, activeTab, isSidebarCollapsed, isMobileMenuOpen, company, customers, products, documents, employees,
-                    isFormOpen, isEditMode, isViewOnly, formType, formData, docFilter, printDoc,
+                    isFormOpen, isEditMode, isViewOnly, formType, formData, docFilter, printDoc, adminAuth,
                     isCustomerModalOpen, customerForm, isProductModalOpen, productForm, isEmployeeModalOpen, employeeForm,
                     selectedMonth, oldDocSearch, oldDocDateStart, oldDocDateEnd, stats, dashboardSales, filteredDocs, filteredOldDocs, calculatedTotals,
                     handleLogin, handleLogout, changeTab, formatNumber, formatDate, getCustomer,
                     openDocForm, editDocForm, convertDocTo, viewDocForm, addItem, removeItem, onProductSelect, saveDocument,
                     getStatusStyle, getStatusText, setPrintDoc, closePrint, triggerPrint, openPrintFromForm,
                     openCustomerForm, saveCustomer, openProductForm, saveProduct, openEmployeeForm, saveEmployee, deleteEmployee,
-                    handleLogoUpload, clearLogo, saveSettings, exportCSV, navItems
+                    handleLogoUpload, clearLogo, saveSettings, saveAdminAuth, exportCSV, navItems
                 };
             }
         }).mount('#app');
