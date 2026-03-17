@@ -13,6 +13,8 @@
     
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- html2pdf -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap');
@@ -35,12 +37,12 @@
                 left: 0 !important; 
                 top: 0 !important; 
                 width: 210mm !important; 
-                height: 297mm !important; /* บังคับสูง A4 */
+                height: 297mm !important;
                 margin: 0 !important; 
-                padding: 15mm !important; /* เว้นขอบด้านใน */
+                padding: 15mm !important; 
                 box-shadow: none !important;
                 page-break-after: avoid !important;
-                transform: scale(1) !important;
+                transform: none !important;
             }
             @page { size: A4 portrait; margin: 0mm; }
             .no-print { display: none !important; }
@@ -187,11 +189,11 @@
                                 <span class="font-bold text-slate-500 mb-1 block border-b border-slate-200 pb-1">หมายเหตุ:</span>
                                 <span id="print-doc-notes" class="whitespace-pre-wrap leading-tight block mt-1"></span>
                             </div>
-                            <div id="print-stamp-paid" class="hidden text-sm bg-green-50 text-green-800 p-1.5 border border-green-200 rounded flex items-center justify-center font-bold">
-                                <i class="fas fa-check-circle mr-2"></i> ชำระเงินเรียบร้อยแล้ว
+                            <div id="print-stamp-paid" class="hidden text-sm bg-green-50 text-green-800 p-1.5 border border-green-200 rounded flex items-center justify-center font-bold mt-2">
+                                <i class="fas fa-check-circle mr-2 text-lg"></i> ชำระเงินเรียบร้อยแล้ว
                             </div>
                         </div>
-                        <div class="w-[45%]">
+                        <div class="w-[40%]">
                             <table class="w-full text-sm">
                                 <tbody id="print-totals-tbody">
                                     <!-- Totals will be injected here -->
@@ -735,8 +737,9 @@
             formItems: [],
             docTotals: { subtotal: 0, vatAmount: 0, whtAmount: 0, grandTotal: 0 },
             printDocData: null,
-            isSetupMode: false, // true = Auto setup Admin for first time
-            currentUserRole: 'employee',
+            isSetupMode: false, 
+            currentUserRole: null, // ถูกรีเซ็ตตอนเริ่มเพื่อให้เช็คสิทธิ์ได้แม่นยำ
+            profileLoaded: false,  // ตัวเช็คการดึงข้อมูลเพื่อแก้บั๊กโดนเตะออก
             listeners: []
         };
 
@@ -755,7 +758,7 @@
                             window.appState.isSetupMode = true;
                             el('auth-title').textContent = 'สร้างบัญชีผู้ดูแลระบบ (Admin)';
                             el('auth-submit-btn').textContent = 'สร้างบัญชี Admin';
-                            el('auth-toggle-btn').classList.add('hidden'); // ซ่อนปุ่ม Setup
+                            el('auth-toggle-btn').classList.add('hidden'); 
                             Swal.fire({
                                 title: 'ตั้งค่าการใช้งานครั้งแรก',
                                 text: 'ระบบยังไม่มีผู้ดูแล กรุณาสร้างบัญชีสำหรับผู้ดูแลระบบ (Admin)',
@@ -765,7 +768,7 @@
                             window.appState.isSetupMode = false;
                             el('auth-title').textContent = 'เข้าสู่ระบบ';
                             el('auth-submit-btn').textContent = 'เข้าสู่ระบบ';
-                            el('auth-toggle-btn').classList.remove('hidden'); // โชว์ปุ่มเผื่อลืมหรือสร้างไม่สำเร็จ
+                            el('auth-toggle-btn').classList.remove('hidden'); 
                         }
                         el('view-auth').classList.remove('hidden');
                         el('main-layout').classList.add('hidden');
@@ -787,6 +790,8 @@
                 
                 window.appState.listeners.forEach(unsub => unsub());
                 window.appState.listeners = [];
+                window.appState.profileLoaded = false;
+                window.appState.currentUserRole = null;
                 
                 signInAnonymously(auth).catch(err => {
                     el('global-loading').classList.add('hidden');
@@ -873,24 +878,48 @@
 
             const uid = auth.currentUser.uid;
 
-            const unsubProfile = onSnapshot(doc(db, publicPath, 'employees', uid), (snap) => {
-                if(!snap.exists() && window.appState.currentUserRole) {
+            // ดักจับข้อมูลผู้ใช้แบบ Realtime และป้องกันบั๊กหน้ากระดาษโหลด
+            const unsubProfile = onSnapshot(doc(db, publicPath, 'employees', uid), async (snap) => {
+                if(!snap.exists()) {
+                    // หากยังไม่เคยโหลดข้อมูลโปรไฟล์สำเร็จเลย (อาจเกิดจากโหลดเร็วกว่าตอนเซฟลงฐานข้อมูลในครั้งแรก)
+                    if (!window.appState.profileLoaded) {
+                        // ลองตรวจสอบว่าฐานข้อมูลว่างเปล่าไหม เพื่อกู้คืน Admin
+                        const empSnap = await getDocs(collection(db, publicPath, 'employees'));
+                        if (empSnap.empty) {
+                            await setDoc(doc(db, publicPath, 'employees', uid), {
+                                name: 'System Admin',
+                                email: auth.currentUser.email || '',
+                                role: 'admin',
+                                createdAt: new Date().toISOString()
+                            });
+                        } else {
+                            // รอ 2 วินาทีเผื่อระบบกำลังบันทึกข้อมูล ถ้ายังไม่มีค่อยเด้งออก
+                            setTimeout(async () => {
+                                if (!window.appState.profileLoaded && auth.currentUser) {
+                                    Swal.fire('ไม่มีสิทธิ์เข้าถึง', 'บัญชีนี้ไม่ได้เป็นพนักงานในระบบ', 'error').then(() => signOut(auth));
+                                }
+                            }, 2000);
+                        }
+                        return;
+                    }
+
+                    // ถ้าเคยโหลดโปรไฟล์ได้แล้ว แต่จู่ๆ หายไป แสดงว่าถูก Admin ลบ
                     Swal.fire('การเข้าถึงถูกระงับ', 'บัญชีของคุณถูกลบหรือระงับการใช้งาน', 'error').then(() => {
                         signOut(auth);
                     });
                     return;
                 }
-                if(snap.exists()) {
-                    const data = snap.data();
-                    window.appState.currentUserRole = data.role;
-                    el('header-user-name').textContent = data.name;
-                    
-                    if (data.role === 'admin') {
-                        el('nav-employees').classList.remove('hidden');
-                    } else {
-                        el('nav-employees').classList.add('hidden');
-                        if(window.appState.currentView === 'employees') window.app.switchView('dashboard');
-                    }
+                
+                window.appState.profileLoaded = true;
+                const data = snap.data();
+                window.appState.currentUserRole = data.role;
+                el('header-user-name').textContent = data.name;
+                
+                if (data.role === 'admin') {
+                    el('nav-employees').classList.remove('hidden');
+                } else {
+                    el('nav-employees').classList.add('hidden');
+                    if(window.appState.currentView === 'employees') window.app.switchView('dashboard');
                 }
             });
 
