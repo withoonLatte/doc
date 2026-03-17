@@ -425,7 +425,7 @@
                     <div v-if="activeTab === 'customers'" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div class="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                             <h3 class="font-bold text-slate-800">ข้อมูลลูกค้า</h3>
-                            <button @click="openCustomerForm" class="px-3 sm:px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-bold border border-emerald-200 hover:bg-emerald-100 transition"><i class="fas fa-plus mr-1 sm:mr-2"></i> <span class="hidden sm:inline">เพิ่มลูกค้า</span><span class="sm:hidden">เพิ่ม</span></button>
+                            <button @click="openCustomerForm" class="px-3 sm:px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-bold border border-emerald-200 hover:bg-emerald-100 flex items-center transition"><i class="fas fa-plus mr-1 sm:mr-2"></i> <span class="hidden sm:inline">เพิ่มลูกค้า</span><span class="sm:hidden">เพิ่ม</span></button>
                         </div>
                         <div class="overflow-x-auto w-full">
                             <table class="w-full text-left text-sm min-w-[600px]"><thead class="bg-white border-b border-slate-200"><tr><th class="p-4 text-slate-500 font-semibold whitespace-nowrap">รหัส</th><th class="p-4 text-slate-500 font-semibold whitespace-nowrap">ชื่อ</th><th class="p-4 text-slate-500 font-semibold whitespace-nowrap">เบอร์โทร</th><th class="p-4 text-slate-500 font-semibold whitespace-nowrap">อีเมล</th></tr></thead>
@@ -436,7 +436,7 @@
                     <div v-if="activeTab === 'products'" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div class="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                             <h3 class="font-bold text-slate-800">ข้อมูลสินค้า/บริการ</h3>
-                            <button @click="openProductForm" class="px-3 sm:px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-bold border border-emerald-200 hover:bg-emerald-100 transition"><i class="fas fa-plus mr-1 sm:mr-2"></i> <span class="hidden sm:inline">เพิ่มรายการ</span><span class="sm:hidden">เพิ่ม</span></button>
+                            <button @click="openProductForm" class="px-3 sm:px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-bold border border-emerald-200 hover:bg-emerald-100 flex items-center transition"><i class="fas fa-plus mr-1 sm:mr-2"></i> <span class="hidden sm:inline">เพิ่มรายการ</span><span class="sm:hidden">เพิ่ม</span></button>
                         </div>
                         <div class="overflow-x-auto w-full">
                             <table class="w-full text-left text-sm min-w-[500px]"><thead class="bg-white border-b border-slate-200"><tr><th class="p-4 text-slate-500 font-semibold whitespace-nowrap">รหัส</th><th class="p-4 text-slate-500 font-semibold whitespace-nowrap">ชื่อรายการ</th><th class="p-4 text-slate-500 font-semibold text-right whitespace-nowrap">ราคา</th></tr></thead>
@@ -825,9 +825,9 @@
                     isFormOpen, isEditMode, isViewOnly, formType, formData, docFilter, printDoc,
                     isCustomerModalOpen, customerForm, isProductModalOpen, productForm, isEmployeeModalOpen, employeeForm,
                     selectedMonth, oldDocSearch, oldDocDateStart, oldDocDateEnd, stats, dashboardSales, filteredDocs, filteredOldDocs, calculatedTotals,
-                    handleLogin, handleLogout, changeTab, formatNum, formatNumber, formatDate, getCustomer,
+                    handleLogin, handleLogout, changeTab, formatNum, formatDate, getCustomer,
                     openDocForm, editDocForm, convertDocTo, viewDocForm, addItem, removeItem, onProductSelect, saveDocument,
-                    getStatusStyle, getStatusText, setPrintDoc, openPrintView, closePrint, triggerPrint, openPrintFromForm,
+                    getStatusStyle, getStatusText, setPrintDoc, openPrintView, triggerPrint, openPrintFromForm,
                     openCustomerForm, saveCustomer, openProductForm, saveProduct, openEmployeeForm, saveEmployee, deleteEmployee,
                     handleLogoUpload, saveSettings, clearLogo, exportCSV, navItems
                 };
