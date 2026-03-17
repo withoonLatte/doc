@@ -1,1329 +1,897 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบจัดการเอกสารขาย (Serverless SPA)</title>
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  LayoutDashboard, FileText, Users, Package, Settings, Plus, Edit, Trash2, 
+  Printer, ChevronLeft, ChevronRight, CheckCircle, AlertCircle, ArrowRight, 
+  DollarSign, X, Menu, LogOut, UserPlus, Shield
+} from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, onSnapshot } from 'firebase/firestore';
+
+// --- 1. Firebase Setup ---
+const firebaseConfig = {
+  apiKey: "AIzaSyD5PoZ4QcAo7mBspIscnsO6cnUxGPyY7iQ",
+  authDomain: "cdz-doc.firebaseapp.com",
+  projectId: "cdz-doc",
+  storageBucket: "cdz-doc.firebasestorage.app",
+  messagingSenderId: "236255831921",
+  appId: "1:236255831921:web:48076c3fdc410b653d78d0"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const publicPath = `artifacts/${firebaseConfig.projectId}/public/data`;
+
+// --- Helper Functions ---
+const formatNum = (num) => Number(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length >= 3) return `${parts[2].substring(0, 2)}/${parts[1]}/${parts[0]}`;
+  return dateStr;
+};
+
+// ==========================================
+// MAIN APP COMPONENT
+// ==========================================
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem('cdz_doc_user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+    setAuthLoading(false);
+  }, []);
+
+  const handleLogin = (userData) => {
+    localStorage.setItem('cdz_doc_user', JSON.stringify(userData));
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('cdz_doc_user');
+    setUser(null);
+  };
+
+  if (authLoading) return <div className="flex h-screen items-center justify-center bg-slate-50"><p className="text-emerald-600">กำลังโหลด...</p></div>;
+
+  if (!user) {
+    return <AuthScreen onLogin={handleLogin} />;
+  }
+
+  return <MainDashboard user={user} onLogout={handleLogout} />;
+}
+
+// ==========================================
+// AUTH SCREEN (Login / Setup)
+// ==========================================
+function AuthScreen({ onLogin }) {
+  const [isSetup, setIsSetup] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    checkSetup();
+  }, []);
+
+  const checkSetup = async () => {
+    try {
+      const snap = await getDocs(collection(db, publicPath, 'employees'));
+      setIsSetup(snap.empty);
+    } catch (err) {
+      console.error(err);
+      setError('ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาตรวจสอบ Rules ของ Firestore');
+    }
+    setLoading(false);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
     
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    try {
+      const { name, email, password } = formData;
+      if (isSetup) {
+        const newId = 'E' + Date.now().toString().slice(-6);
+        const userData = { id: newId, name: name || 'Admin', email, password, role: 'admin', createdAt: new Date().toISOString() };
+        await setDoc(doc(db, publicPath, 'employees', newId), userData);
+        onLogin(userData);
+      } else {
+        const snap = await getDocs(collection(db, publicPath, 'employees'));
+        const userDoc = snap.docs.find(d => d.data().email === email && d.data().password === password);
+        if (userDoc) {
+          onLogin({ id: userDoc.id, ...userDoc.data() });
+        } else {
+          setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+        }
+      }
+    } catch (err) {
+      setError('เกิดข้อผิดพลาด กรุณาลองใหม่');
+    }
+    setLoading(false);
+  };
+
+  if (loading) return <div className="flex h-screen items-center justify-center bg-slate-100"><span className="text-emerald-600">กำลังตรวจสอบระบบ...</span></div>;
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200">
+        <div className="bg-emerald-600 p-6 text-center text-white">
+          <DollarSign className="w-12 h-12 mx-auto mb-2" />
+          <h2 className="text-2xl font-bold">{isSetup ? 'สร้างบัญชีผู้ดูแลระบบ' : 'เข้าสู่ระบบ'}</h2>
+          <p className="text-emerald-100 text-sm mt-1">ระบบจัดการเอกสารขาย</p>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && <div className="bg-red-50 text-red-600 p-3 rounded text-sm text-center">{error}</div>}
+          
+          {isSetup && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">ชื่อผู้ใช้</label>
+              <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none" required placeholder="ชื่อ-นามสกุล" />
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">อีเมล</label>
+            <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none" required placeholder="name@example.com" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">รหัสผ่าน</label>
+            <input type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none" required placeholder="••••••••" />
+          </div>
+          <button type="submit" disabled={loading} className="w-full bg-emerald-600 text-white font-bold rounded-lg px-4 py-3 hover:bg-emerald-700 transition shadow-md disabled:opacity-50">
+            {loading ? 'กำลังประมวลผล...' : (isSetup ? 'เริ่มต้นใช้งาน' : 'เข้าสู่ระบบ')}
+          </button>
+          
+          {!isSetup && (
+            <div className="text-center mt-4 pt-4 border-t border-slate-100">
+               <button type="button" onClick={() => setIsSetup(true)} className="text-xs text-slate-400 hover:text-emerald-600 transition-colors">ลืมรหัสผ่าน / บังคับตั้งค่าใหม่</button>
+            </div>
+          )}
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// MAIN DASHBOARD LAYOUT & REALTIME DATA
+// ==========================================
+function MainDashboard({ user, onLogout }) {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Data States
+  const [company, setCompany] = useState({});
+  const [customers, setCustomers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  // Current User Role check
+  const currentUserRecord = employees.find(e => e.id === user.id);
+  const userRole = currentUserRecord ? currentUserRecord.role : user.role;
+
+  // Print State
+  const [printDoc, setPrintDoc] = useState(null);
+
+  useEffect(() => {
+    const unsubSettings = onSnapshot(doc(db, publicPath, 'settings', 'profile'), doc => setCompany(doc.exists() ? doc.data() : {}));
+    const unsubCust = onSnapshot(collection(db, publicPath, 'customers'), snap => setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubProd = onSnapshot(collection(db, publicPath, 'products'), snap => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubDocs = onSnapshot(collection(db, publicPath, 'documents'), snap => setDocuments(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => b.id.localeCompare(a.id))));
+    const unsubEmp = onSnapshot(collection(db, publicPath, 'employees'), snap => {
+      const emps = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setEmployees(emps);
+      if (!emps.find(e => e.id === user.id)) {
+        alert("บัญชีของคุณถูกระงับ");
+        onLogout();
+      }
+    });
+
+    setDataLoaded(true);
+
+    return () => {
+      unsubSettings(); unsubCust(); unsubProd(); unsubDocs(); unsubEmp();
+    };
+  }, [user.id, onLogout]);
+
+  // View Switcher
+  const renderContent = () => {
+    if (!dataLoaded) return <div className="p-8 text-center text-slate-500">กำลังโหลดข้อมูล...</div>;
+    if (printDoc) return <PrintView doc={printDoc} company={company} customer={customers.find(c => c.id === printDoc.customerId) || {}} onClose={() => setPrintDoc(null)} />;
     
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    switch (activeTab) {
+      case 'dashboard': return <DashboardView documents={documents} getCustomer={id => customers.find(c => c.id === id) || {}} />;
+      case 'documents': return <DocumentsView documents={documents} customers={customers} products={products} getCustomer={id => customers.find(c => c.id === id) || {}} onPrint={setPrintDoc} />;
+      case 'old_documents': return <OldDocumentsView documents={documents} getCustomer={id => customers.find(c => c.id === id) || {}} onPrint={setPrintDoc} />;
+      case 'customers': return <CustomersView customers={customers} />;
+      case 'products': return <ProductsView products={products} />;
+      case 'employees': return userRole === 'admin' ? <EmployeesView employees={employees} currentUser={user} /> : <div className="p-8 text-center text-red-500">ไม่มีสิทธิ์เข้าถึง</div>;
+      case 'settings': return <SettingsView company={company} />;
+      default: return <DashboardView documents={documents} getCustomer={id => customers.find(c => c.id === id) || {}} />;
+    }
+  };
+
+  const navItems = [
+    { id: 'dashboard', label: 'แดชบอร์ด', icon: <LayoutDashboard size={20} /> },
+    { id: 'documents', label: 'เอกสารขาย', icon: <FileText size={20} /> },
+    { id: 'old_documents', label: 'เอกสารเก่า', icon: <FileText size={20} className="opacity-70" /> },
+    { id: 'customers', label: 'ลูกค้า', icon: <Users size={20} /> },
+    { id: 'products', label: 'สินค้า', icon: <Package size={20} /> },
+    { id: 'settings', label: 'ตั้งค่า', icon: <Settings size={20} /> },
+  ];
+
+  if (userRole === 'admin') {
+    navItems.push({ id: 'employees', label: 'พนักงาน', icon: <Shield size={20} /> });
+  }
+
+  const handleNavClick = (id) => {
+    setActiveTab(id);
+    setMobileMenuOpen(false);
+  };
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-slate-50 font-sans">
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 z-40 md:hidden" onClick={() => setMobileMenuOpen(false)} />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`fixed md:relative z-50 h-full bg-[#064e3b] text-white transition-all duration-300 flex flex-col
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        ${isSidebarCollapsed ? 'md:w-20' : 'w-64'}
+      `}>
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1604147706283-d7119b5b822c?q=80&w=600&auto=format&fit=crop')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
+        <div className="relative z-10 flex flex-col h-full">
+          <div className="p-4 flex items-center border-b border-white/10 h-16 shrink-0 justify-center md:justify-start overflow-hidden">
+            <div className="w-10 h-10 shrink-0 bg-white rounded-lg flex items-center justify-center text-emerald-800 font-bold text-xl">S</div>
+            {!isSidebarCollapsed && <span className="ml-3 text-xl font-bold tracking-wide">Sales Doc</span>}
+          </div>
+          
+          <nav className="flex-1 py-6 overflow-y-auto px-3 space-y-1.5">
+            {navItems.map(item => (
+              <button 
+                key={item.id} 
+                onClick={() => handleNavClick(item.id)}
+                title={isSidebarCollapsed ? item.label : ''}
+                className={`w-full flex items-center py-3 rounded-xl transition-all duration-200
+                  ${isSidebarCollapsed ? 'justify-center px-0' : 'px-4'}
+                  ${activeTab === item.id 
+                    ? 'bg-white/20 text-white font-bold shadow-sm' 
+                    : 'text-emerald-50 hover:bg-white/10 hover:text-white font-medium'}
+                `}
+              >
+                <div className="shrink-0">{item.icon}</div>
+                {!isSidebarCollapsed && <span className="ml-3 truncate">{item.label}</span>}
+              </button>
+            ))}
+          </nav>
+          
+          <div className="p-3 border-t border-white/10 hidden md:block">
+             <button onClick={() => setSidebarCollapsed(!isSidebarCollapsed)} className="w-full flex items-center justify-center py-2 text-emerald-100 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+                {isSidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+             </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className={`flex-1 flex flex-col h-full overflow-hidden transition-all duration-300 ${printDoc ? 'hidden' : ''}`}>
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 shrink-0 z-10 shadow-sm">
+          <div className="flex items-center">
+             <button onClick={() => setMobileMenuOpen(true)} className="p-2 mr-3 text-slate-500 hover:bg-slate-100 rounded-md md:hidden">
+               <Menu size={20} />
+             </button>
+             <h1 className="text-lg font-bold text-slate-800">
+               {navItems.find(i => i.id === activeTab)?.label || 'ระบบ'}
+             </h1>
+          </div>
+          <div className="flex items-center space-x-4">
+             <div className="text-right hidden sm:block">
+               <div className="text-sm font-bold text-slate-700 truncate max-w-[150px]">{company.name || 'ตั้งค่าบริษัท'}</div>
+               <div className="text-xs text-emerald-600 font-medium">{user.name}</div>
+             </div>
+             <button onClick={onLogout} title="ออกจากระบบ" className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors flex items-center">
+               <LogOut size={20} />
+             </button>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 relative">
+           {renderContent()}
+        </div>
+      </main>
+
+      {/* Render Print View over layout if active */}
+      {printDoc && renderContent()}
+    </div>
+  );
+}
+
+// ==========================================
+// VIEWS
+// ==========================================
+
+function DashboardView({ documents, getCustomer }) {
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+
+  const stats = useMemo(() => {
+    const monthDocs = documents.filter(d => d.date.startsWith(selectedMonth));
+    const reDocs = monthDocs.filter(d => d.type === 'RE');
+    const ivDocs = monthDocs.filter(d => d.type === 'IV');
     
-    <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- html2pdf -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    return {
+      totalSales: reDocs.reduce((s, d) => s + d.grandTotal, 0),
+      receiptsCount: reDocs.length,
+      pendingAmount: ivDocs.filter(d => d.status === 'Unpaid').reduce((s, d) => s + d.grandTotal, 0),
+      invoicesCount: ivDocs.length,
+      salesData: reDocs
+    };
+  }, [documents, selectedMonth]);
 
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Kanit', sans-serif; }
+  return (
+    <div className="space-y-6">
+      <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 rounded-2xl shadow-md p-6 text-white flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
+          <DollarSign className="absolute right-0 top-0 opacity-10 w-48 h-48 -translate-y-8 translate-x-8" />
+          <div className="relative z-10 text-center md:text-left">
+              <h2 className="text-2xl font-bold mb-1">ยินดีต้อนรับสู่ระบบจัดการเอกสารขาย</h2>
+              <p className="text-emerald-100 text-sm">สร้างใบเสนอราคา ใบแจ้งหนี้ และรับชำระเงินได้อย่างรวดเร็วที่นี่</p>
+          </div>
+      </div>
 
-        .sidebar-bg { 
-            background-color: #064e3b; 
-            background-image: url('bg.jpg'); 
-            background-size: cover; 
-            background-position: center; 
-            position: relative;
-        }
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center space-x-3 w-full sm:w-auto">
+              <span className="font-medium text-slate-700">เลือกเดือน:</span>
+              <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="p-2 border border-slate-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-emerald-400 w-full sm:w-auto" />
+          </div>
+          <button onClick={() => alert('ฟังก์ชัน Export CSV กำลังพัฒนาปรับปรุง')} className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium transition shadow-sm">
+              Export ยอดขาย
+          </button>
+      </div>
 
-        /* ตั้งค่าหน้าพิมพ์ Print/PDF แบบพอดีเป๊ะ */
-        @media print {
-            body * { visibility: hidden; background: #fff !important; }
-            #print-modal, #print-modal * { visibility: visible; }
-            #print-section { 
-                position: absolute !important; 
-                left: 0 !important; 
-                top: 0 !important; 
-                width: 210mm !important; 
-                height: 297mm !important;
-                margin: 0 !important; 
-                padding: 15mm !important; 
-                box-shadow: none !important;
-                page-break-after: avoid !important;
-                transform: scale(1) !important;
-            }
-            @page { size: A4 portrait; margin: 0mm; }
-            .no-print { display: none !important; }
-        }
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center">
+              <div className="w-12 h-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center mr-4 shrink-0"><DollarSign /></div>
+              <div><p className="text-xs text-slate-500 font-medium mb-1">รายได้รวม (ใบเสร็จ)</p><p className="text-xl font-bold text-slate-800">฿{formatNum(stats.totalSales)}</p></div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center">
+              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mr-4 shrink-0"><CheckCircle /></div>
+              <div><p className="text-xs text-slate-500 font-medium mb-1">จำนวนใบเสร็จ</p><p className="text-xl font-bold text-slate-800">{stats.receiptsCount} รายการ</p></div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center">
+              <div className="w-12 h-12 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center mr-4 shrink-0"><AlertCircle /></div>
+              <div><p className="text-xs text-slate-500 font-medium mb-1">รอรับชำระ (บิล)</p><p className="text-xl font-bold text-slate-800">฿{formatNum(stats.pendingAmount)}</p></div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center">
+              <div className="w-12 h-12 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center mr-4 shrink-0"><FileText /></div>
+              <div><p className="text-xs text-slate-500 font-medium mb-1">จำนวนใบแจ้งหนี้</p><p className="text-xl font-bold text-slate-800">{stats.invoicesCount} รายการ</p></div>
+          </div>
+      </div>
 
-        /* Sidebar Transition */
-        #sidebar { transition: width 0.3s ease, transform 0.3s ease; }
-        .sidebar-collapsed .sidebar-text { display: none; }
-        .sidebar-collapsed .nav-btn { justify-content: center; padding-left: 0; padding-right: 0; }
-    </style>
-</head>
-<body class="bg-slate-50 text-slate-800">
-
-    <!-- ================== LOADING SPINNER ================== -->
-    <div id="global-loading" class="fixed inset-0 bg-white z-[100] flex items-center justify-center">
-        <div class="text-center">
-            <i class="fas fa-circle-notch fa-spin text-5xl text-emerald-600 mb-4"></i>
-            <p class="text-slate-500 font-medium mt-3">กำลังเชื่อมต่อฐานข้อมูล...</p>
-        </div>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-4 border-b border-slate-200 bg-slate-50"><h3 className="font-bold text-slate-800">รายการยอดขายเดือนนี้ (ใบเสร็จ)</h3></div>
+          <div className="overflow-x-auto">
+              <table className="w-full text-left min-w-[600px] text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+                      <tr><th className="p-4 font-medium">วันที่</th><th className="p-4 font-medium">เลขที่เอกสาร</th><th className="p-4 font-medium">ลูกค้า</th><th className="p-4 font-medium text-right">ยอดรวมสุทธิ</th></tr>
+                  </thead>
+                  <tbody>
+                    {stats.salesData.length === 0 ? (
+                      <tr><td colSpan="4" className="p-8 text-center text-slate-500">ไม่มีข้อมูลยอดขายในเดือนนี้</td></tr>
+                    ) : (
+                      stats.salesData.map(doc => (
+                        <tr key={doc.id} className="border-b border-slate-100 hover:bg-slate-50">
+                          <td className="p-4 text-slate-600">{formatDate(doc.date)}</td>
+                          <td className="p-4 font-semibold text-emerald-600">{doc.id}</td>
+                          <td className="p-4 font-medium text-slate-800">{getCustomer(doc.customerId).name || '-'}</td>
+                          <td className="p-4 font-bold text-emerald-600 text-right">฿{formatNum(doc.grandTotal)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+              </table>
+          </div>
+      </div>
     </div>
+  );
+}
 
-    <!-- ================== AUTH VIEW (Custom Login) ================== -->
-    <div id="view-auth" class="hidden min-h-screen flex items-center justify-center bg-slate-100 p-4 relative z-50">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200">
-            <div class="bg-emerald-600 p-6 text-center text-white">
-                <i class="fas fa-file-invoice-dollar text-4xl mb-2"></i>
-                <h2 id="auth-title" class="text-2xl font-bold">เข้าสู่ระบบ</h2>
-                <p class="text-emerald-100 text-sm mt-1">ระบบจัดการเอกสารขาย</p>
-            </div>
-            <form onsubmit="window.app.handleAuth(event)" class="p-6 sm:p-8 space-y-5">
-                <div id="setup-name-field" class="hidden">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อผู้ใช้ (Admin)</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-user text-slate-400"></i></div>
-                        <input type="text" id="auth-name" class="w-full pl-10 p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 transition" placeholder="ชื่อ-นามสกุล">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">อีเมล</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-envelope text-slate-400"></i></div>
-                        <input type="email" id="auth-email" class="w-full pl-10 p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 transition" required placeholder="name@example.com">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">รหัสผ่าน</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-lock text-slate-400"></i></div>
-                        <input type="password" id="auth-pass" class="w-full pl-10 p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 transition" required placeholder="••••••••">
-                    </div>
-                </div>
-                <button type="submit" id="auth-submit-btn" class="w-full bg-emerald-600 text-white font-bold rounded-lg px-4 py-3 hover:bg-emerald-700 transition shadow-md">
-                    เข้าสู่ระบบ
-                </button>
-                
-                <!-- เพิ่มปุ่มนี้กลับเข้าไปเพื่อให้ JavaScript ทำงานได้ -->
-                <div class="text-center mt-4 pt-4 border-t border-slate-100">
-                    <button type="button" onclick="window.app.toggleSetupMode()" id="auth-toggle-btn" class="text-xs text-slate-400 hover:text-emerald-600 font-medium transition-colors">
-                        <i class="fas fa-cog mr-1"></i> สำหรับการใช้งานครั้งแรก (สร้าง Admin)
-                    </button>
-                </div>
-            </form>
+function DocumentsView({ documents, customers, products, getCustomer, onPrint }) {
+  const [filter, setFilter] = useState('ALL');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formType, setFormType] = useState('QT');
+  const [editingDoc, setEditingDoc] = useState(null);
+
+  const filteredDocs = documents.filter(d => filter === 'ALL' || d.type === filter);
+
+  const openNewForm = (type) => { setFormType(type); setEditingDoc(null); setIsFormOpen(true); };
+  const editDoc = (doc) => { setFormType(doc.type); setEditingDoc(doc); setIsFormOpen(true); };
+  const viewDoc = (doc) => { setFormType(doc.type); setEditingDoc({...doc, _isViewOnly: true}); setIsFormOpen(true); };
+  
+  const convertDoc = (doc, newType) => {
+    const newDoc = { ...doc, type: newType, refId: doc.id, status: newType === 'IV' ? 'Unpaid' : 'Paid', date: new Date().toISOString().split('T')[0] };
+    setFormType(newType); setEditingDoc(newDoc); setIsFormOpen(true);
+  };
+
+  const getStatusBadge = (status) => {
+    const map = { 'Pending': 'bg-amber-100 text-amber-700 border-amber-200', 'Invoiced': 'bg-teal-100 text-teal-700 border-teal-200', 'Unpaid': 'bg-orange-100 text-orange-700 border-orange-200', 'Paid': 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+    const textMap = { 'Pending': 'รอดำเนินการ', 'Invoiced': 'ออกบิลแล้ว', 'Unpaid': 'รอชำระเงิน', 'Paid': 'ชำระแล้ว' };
+    return <span className={`px-2 py-1 text-xs font-bold rounded border ${map[status] || 'bg-slate-100 text-slate-700'}`}>{textMap[status] || status}</span>;
+  };
+
+  if (isFormOpen) {
+    return <DocumentForm type={formType} initialData={editingDoc} customers={customers} products={products} onClose={() => setIsFormOpen(false)} onPrint={onPrint} />;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex space-x-1 bg-white p-1 rounded-lg shadow-sm border border-slate-200 w-full overflow-x-auto">
+          {['ALL', 'QT', 'IV', 'RE'].map(t => (
+            <button key={t} onClick={() => setFilter(t)} className={`flex-1 px-4 py-2 rounded-md text-sm font-semibold whitespace-nowrap transition-colors ${filter === t ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+              {t === 'ALL' ? 'ทั้งหมด' : t === 'QT' ? 'ใบเสนอราคา' : t === 'IV' ? 'ใบแจ้งหนี้' : 'ใบเสร็จ'}
+            </button>
+          ))}
         </div>
-    </div>
-
-    <!-- ================== PRINT VIEW ================== -->
-    <div id="print-modal" class="hidden fixed inset-0 bg-slate-800/95 z-50 flex-col overflow-hidden py-4 px-2 sm:py-8 sm:px-4">
-        <!-- Controls -->
-        <div class="no-print bg-white p-3 sm:p-4 rounded-xl shadow-lg flex flex-wrap justify-center gap-2 sm:gap-3 mb-4 shrink-0 w-full max-w-sm mx-auto border border-slate-200">
-            <button onclick="window.app.triggerPrint()" class="px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center flex-1 justify-center transition shadow-sm font-semibold text-sm sm:text-base"><i class="fas fa-print mr-2"></i> พิมพ์ / PDF</button>
-            <button onclick="window.app.closePrint()" class="px-4 py-2 sm:py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg flex items-center justify-center transition shadow-sm font-semibold text-sm sm:text-base"><i class="fas fa-times mr-2"></i> ปิด</button>
+        <div className="flex space-x-2 w-full md:w-auto">
+          <button onClick={() => openNewForm('QT')} className="flex-1 md:flex-none flex items-center justify-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-bold shadow-sm transition"><Plus size={16} className="mr-1"/> สร้าง QT</button>
+          <button onClick={() => openNewForm('IV')} className="flex-1 md:flex-none flex items-center justify-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-bold shadow-sm transition"><Plus size={16} className="mr-1"/> สร้าง IV</button>
         </div>
+      </div>
 
-        <div class="flex-1 overflow-auto w-full flex justify-center pb-12">
-            <!-- A4 Paper -->
-            <div id="print-section" class="bg-white text-slate-800 box-border flex flex-col justify-between shadow-2xl shrink-0 print:shadow-none print:m-0 overflow-hidden origin-top scale-[0.45] md:scale-100" style="width: 210mm; height: 297mm; padding: 15mm; margin: 0 auto;">
-                <div>
-                    <div class="flex justify-between items-start border-b-2 border-slate-800 pb-3 mb-3 shrink-0">
-                        <div class="flex items-start gap-4">
-                            <img id="print-logo" src="" alt="Logo" class="hidden h-14 w-auto object-contain shrink-0" style="max-width: 160px;">
-                            <div id="print-logo-placeholder" class="w-14 h-14 shrink-0 bg-emerald-600 text-white flex items-center justify-center font-bold text-xl rounded shadow">LOGO</div>
-                            <div class="max-w-[300px]">
-                                <h1 id="print-company-name" class="text-lg font-bold text-emerald-900 leading-tight mb-1"></h1>
-                                <p id="print-company-address" class="text-[11px] text-slate-600 mb-0.5 whitespace-pre-wrap leading-tight"></p>
-                                <p class="text-[11px] text-slate-600 mb-0.5">เลขประจำตัวผู้เสียภาษี: <span id="print-company-tax"></span></p>
-                                <p class="text-[11px] text-slate-600">โทร: <span id="print-company-phone"></span> | อีเมล: <span id="print-company-email"></span></p>
-                            </div>
-                        </div>
-                        <div class="text-right shrink-0 ml-4">
-                            <h2 id="print-doc-title" class="text-xl font-bold text-slate-800 mb-2"></h2>
-                            <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-sm text-left bg-slate-50 p-2 rounded border border-slate-200 min-w-[160px]">
-                                <span class="font-semibold text-slate-600">เลขที่:</span> <span id="print-doc-id" class="font-bold"></span>
-                                <span class="font-semibold text-slate-600">วันที่:</span> <span id="print-doc-date"></span>
-                                <span id="print-ref-label" class="font-semibold text-slate-600 hidden">อ้างอิง:</span> <span id="print-doc-ref" class="hidden"></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flex justify-between mb-4 shrink-0 gap-4">
-                        <div class="flex-1 border border-slate-300 p-2.5 rounded min-h-[80px]">
-                            <h3 class="text-[11px] font-bold text-slate-500 mb-1 border-b border-slate-200 pb-1">ลูกค้า (Customer)</h3>
-                            <p id="print-cust-name" class="font-bold text-sm text-slate-800"></p>
-                            <p id="print-cust-addr" class="text-xs mt-1 text-slate-700"></p>
-                            <p class="text-[11px] mt-1 text-slate-700">เลขประจำตัวผู้เสียภาษี: <span id="print-cust-tax"></span></p>
-                            <p class="text-[11px] mt-1 text-slate-700">โทร: <span id="print-cust-phone"></span> | อีเมล: <span id="print-cust-email"></span></p>
-                        </div>
-                        <div class="w-[30%] border border-slate-300 p-2.5 rounded min-h-[80px] flex flex-col justify-center text-sm">
-                            <div class="flex justify-between mb-1"><span class="text-slate-500 text-[11px]">เงื่อนไขชำระ:</span> <span class="font-medium text-[11px]">30 วัน</span></div>
-                            <div class="flex justify-between mb-1"><span class="text-slate-500 text-[11px]">วันครบกำหนด:</span> <span id="print-doc-due" class="font-medium text-[11px]"></span></div>
-                        </div>
-                    </div>
-
-                    <div class="w-full">
-                        <table class="w-full text-sm border-collapse">
-                            <thead>
-                                <tr class="bg-slate-100 border-y-2 border-slate-400">
-                                    <th class="py-1.5 px-2 text-center w-12 border-r border-white">ลำดับ</th>
-                                    <th class="py-1.5 px-2 text-left border-r border-white">รายละเอียดสินค้า/บริการ</th>
-                                    <th class="py-1.5 px-2 text-right w-20 border-r border-white">จำนวน</th>
-                                    <th class="py-1.5 px-2 text-right w-24 border-r border-white">ราคา/หน่วย</th>
-                                    <th class="py-1.5 px-2 text-right w-28">จำนวนเงิน</th>
-                                </tr>
-                            </thead>
-                            <tbody id="print-items-tbody"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div>
-                    <div class="flex justify-between shrink-0 border-t border-slate-300 pt-3 mt-4 gap-4">
-                        <div class="w-[55%]">
-                            <div class="border border-slate-300 p-2 rounded min-h-[60px] text-xs text-slate-700 mb-2">
-                                <span class="font-bold text-slate-500 mb-1 block border-b border-slate-200 pb-1">หมายเหตุ:</span>
-                                <span id="print-doc-notes" class="whitespace-pre-wrap leading-tight block mt-1"></span>
-                            </div>
-                            <div id="print-stamp-paid" class="hidden text-sm bg-green-50 text-green-800 p-1.5 border border-green-200 rounded flex items-center justify-center font-bold mt-2">
-                                <i class="fas fa-check-circle mr-2 text-lg"></i> ชำระเงินเรียบร้อยแล้ว
-                            </div>
-                        </div>
-                        <div class="w-[45%]">
-                            <table class="w-full text-sm"><tbody id="print-totals-tbody"></tbody></table>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-6 text-center text-[12px] border-t-2 border-slate-400 pt-6 mt-6 shrink-0 relative">
-                        <div>
-                            <div class="border-b border-slate-400 w-40 mx-auto mb-1 h-12"></div>
-                            <p class="font-medium text-slate-800">ผู้รับเอกสาร</p>
-                            <p class="text-[10px] text-slate-500 mt-1">วันที่ _______/_______/_______</p>
-                        </div>
-                        <div class="relative">
-                            <div class="border-b border-slate-400 w-40 mx-auto mb-1 h-12 flex items-end justify-center">
-                                <span class="text-emerald-800 font-serif italic text-lg border-2 border-emerald-500 rounded-full px-3 py-0.5 rotate-[15deg] opacity-70 absolute top-[-15px] bg-white">Approved</span>
-                            </div>
-                            <p class="font-medium text-slate-800">ผู้อนุมัติ / ผู้รับมอบอำนาจ</p>
-                            <p class="text-[10px] text-slate-500 mt-1">วันที่ <span id="print-sign-date"></span></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ================== MAIN LAYOUT ================== -->
-    <div id="main-layout" class="hidden flex h-screen overflow-hidden bg-slate-50 relative">
-        <div id="sidebar-overlay" onclick="window.app.toggleMobileSidebar()" class="fixed inset-0 bg-slate-900/60 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
-
-        <aside id="sidebar" class="sidebar-bg flex flex-col shadow-2xl z-50 border-r border-slate-800 fixed md:relative h-full top-0 left-0 w-64 -translate-x-full md:translate-x-0">
-            <div class="absolute inset-0 bg-slate-900/85 z-0"></div> 
-            <div class="relative z-10 flex flex-col h-full">
-                <div class="p-4 flex items-center border-b border-white/20 h-16 shrink-0 space-x-3 overflow-hidden">
-                    <div class="w-10 h-10 min-w-[40px] bg-white rounded-lg flex items-center justify-center text-emerald-800 font-bold shadow-md text-xl shrink-0">S</div>
-                    <span class="sidebar-text text-xl font-bold text-white tracking-wide truncate drop-shadow-md">Sales Doc</span>
-                </div>
-                
-                <nav class="flex-1 py-6 overflow-y-auto overflow-x-hidden space-y-2 px-3" id="nav-links">
-                    <button data-view="dashboard" onclick="window.app.switchView('dashboard')" class="nav-btn w-full flex items-center py-3 px-4 rounded-xl transition-all duration-200 bg-white/25 text-white shadow-md font-bold backdrop-blur-sm border border-white/20">
-                        <i class="fas fa-chart-line text-lg w-6 text-center shrink-0"></i><span class="sidebar-text ml-3 whitespace-nowrap">แดชบอร์ด</span>
-                    </button>
-                    <button data-view="documents" onclick="window.app.switchView('documents')" class="nav-btn w-full flex items-center py-3 px-4 rounded-xl transition-all duration-200 hover:bg-white/15 hover:text-white text-white/80 font-medium">
-                        <i class="fas fa-file-invoice-dollar text-lg w-6 text-center shrink-0"></i><span class="sidebar-text ml-3 whitespace-nowrap">เอกสารขาย</span>
-                    </button>
-                    <button data-view="old_documents" onclick="window.app.switchView('old_documents')" class="nav-btn w-full flex items-center py-3 px-4 rounded-xl transition-all duration-200 hover:bg-white/15 hover:text-white text-white/80 font-medium">
-                        <i class="fas fa-folder-open text-lg w-6 text-center shrink-0"></i><span class="sidebar-text ml-3 whitespace-nowrap">เอกสารเก่า</span>
-                    </button>
-                    <button data-view="customers" onclick="window.app.switchView('customers')" class="nav-btn w-full flex items-center py-3 px-4 rounded-xl transition-all duration-200 hover:bg-white/15 hover:text-white text-white/80 font-medium">
-                        <i class="fas fa-users text-lg w-6 text-center shrink-0"></i><span class="sidebar-text ml-3 whitespace-nowrap">ลูกค้า</span>
-                    </button>
-                    <button data-view="products" onclick="window.app.switchView('products')" class="nav-btn w-full flex items-center py-3 px-4 rounded-xl transition-all duration-200 hover:bg-white/15 hover:text-white text-white/80 font-medium">
-                        <i class="fas fa-box text-lg w-6 text-center shrink-0"></i><span class="sidebar-text ml-3 whitespace-nowrap">สินค้า</span>
-                    </button>
-                    <button data-view="settings" onclick="window.app.switchView('settings')" class="nav-btn w-full flex items-center py-3 px-4 rounded-xl transition-all duration-200 hover:bg-white/15 hover:text-white text-white/80 font-medium">
-                        <i class="fas fa-cog text-lg w-6 text-center shrink-0"></i><span class="sidebar-text ml-3 whitespace-nowrap">ตั้งค่า</span>
-                    </button>
-                    <button id="nav-employees" data-view="employees" onclick="window.app.switchView('employees')" class="hidden nav-btn w-full flex items-center py-3 px-4 rounded-xl transition-all duration-200 hover:bg-white/15 hover:text-white text-emerald-400 font-bold border border-transparent hover:border-emerald-500/30">
-                        <i class="fas fa-user-shield text-lg w-6 text-center shrink-0"></i><span class="sidebar-text ml-3 whitespace-nowrap">พนักงาน</span>
-                    </button>
-                </nav>
-
-                <div class="p-3 border-t border-white/20 hidden md:block">
-                    <button onclick="window.app.toggleDesktopSidebar()" class="w-full flex items-center justify-center py-2 text-white/50 hover:text-white transition-colors bg-white/5 hover:bg-white/10 rounded-lg">
-                        <i id="sidebar-toggle-icon" class="fas fa-chevron-left"></i>
-                    </button>
-                </div>
-            </div>
-        </aside>
-
-        <main class="flex-1 flex flex-col h-full w-full overflow-hidden bg-slate-50 transition-all duration-300">
-            <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 shrink-0 shadow-sm z-10">
-                <div class="flex items-center space-x-3 sm:space-x-4">
-                    <button onclick="window.app.toggleMobileSidebar()" class="p-2 text-slate-500 hover:bg-slate-100 rounded-md transition-colors md:hidden">
-                        <i class="fas fa-bars text-lg"></i>
-                    </button>
-                    <h1 id="header-title" class="text-lg sm:text-xl font-bold text-slate-800 truncate">ภาพรวมระบบ</h1>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <div class="flex flex-col text-right">
-                        <span id="header-company-name" class="text-sm font-bold text-slate-700 hidden sm:block truncate max-w-[150px]">...</span>
-                        <span id="header-user-name" class="text-xs text-emerald-600 font-medium"></span>
-                    </div>
-                    <button onclick="window.app.logout()" title="ออกจากระบบ" class="flex items-center space-x-2 text-slate-500 hover:text-red-600 transition-colors p-2 rounded-md hover:bg-red-50 border border-transparent hover:border-red-200">
-                        <i class="fas fa-sign-out-alt"></i> <span class="text-sm font-bold hidden sm:block">ออก</span>
-                    </button>
-                </div>
-            </header>
-
-            <div class="flex-1 overflow-y-auto p-4 sm:p-6 w-full relative">
-                
-                <!-- VIEW: DASHBOARD -->
-                <div id="view-dashboard" class="view-section space-y-6">
-                    <div class="bg-gradient-to-r from-emerald-600 to-green-500 rounded-2xl shadow-lg p-5 sm:p-6 text-white flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
-                        <div class="absolute right-0 top-0 opacity-10 pointer-events-none text-[100px] sm:text-[150px] leading-none transform translate-x-8 -translate-y-8"><i class="fas fa-file-invoice-dollar"></i></div>
-                        <div class="relative z-10 text-center md:text-left">
-                            <h2 class="text-xl sm:text-2xl font-bold mb-1">ยินดีต้อนรับสู่ระบบจัดการเอกสารขาย</h2>
-                            <p class="text-emerald-100 text-sm">สร้างใบเสนอราคา ใบแจ้งหนี้ และรับชำระเงินได้อย่างรวดเร็วที่นี่</p>
-                        </div>
-                        <div class="relative z-10 w-full md:w-auto">
-                            <button onclick="window.app.switchView('documents'); window.app.openDocForm('QT');" class="w-full md:w-auto px-6 py-3 bg-white text-emerald-700 rounded-xl font-bold hover:bg-emerald-50 hover:scale-105 transition-all duration-200 shadow-md flex items-center justify-center">
-                                <i class="fas fa-plus-circle text-xl mr-2"></i> สร้างเอกสารขายด่วน
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full md:w-auto">
-                            <span class="font-medium text-slate-700 whitespace-nowrap">เลือกเดือน:</span>
-                            <div class="flex items-center space-x-2 w-full">
-                                <input type="month" id="dash-month" onchange="window.app.updateDashboard()" class="w-full sm:w-auto p-2 border border-slate-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-emerald-400">
-                            </div>
-                        </div>
-                        <button onclick="window.app.exportCSV()" class="w-full md:w-auto px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium flex items-center justify-center transition shadow-sm">
-                            <i class="fas fa-file-csv mr-2"></i> Export ยอดขาย
-                        </button>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center hover:shadow-md transition">
-                            <div class="w-12 h-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center mr-4 shrink-0"><i class="fas fa-coins text-xl"></i></div>
-                            <div><p class="text-xs sm:text-sm text-slate-500 font-medium mb-1">รายได้รวม (ใบเสร็จ)</p><p id="dash-total-sales" class="text-xl sm:text-2xl font-bold text-slate-800">฿0.00</p></div>
-                        </div>
-                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center hover:shadow-md transition">
-                            <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mr-4 shrink-0"><i class="fas fa-check-circle text-xl"></i></div>
-                            <div><p class="text-xs sm:text-sm text-slate-500 font-medium mb-1">จำนวนใบเสร็จ</p><p id="dash-receipts-count" class="text-xl sm:text-2xl font-bold text-slate-800">0 รายการ</p></div>
-                        </div>
-                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center hover:shadow-md transition">
-                            <div class="w-12 h-12 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center mr-4 shrink-0"><i class="fas fa-clock text-xl"></i></div>
-                            <div><p class="text-xs sm:text-sm text-slate-500 font-medium mb-1">รอรับชำระ (บิล)</p><p id="dash-pending-amount" class="text-xl sm:text-2xl font-bold text-slate-800">฿0.00</p></div>
-                        </div>
-                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center hover:shadow-md transition">
-                            <div class="w-12 h-12 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center mr-4 shrink-0"><i class="fas fa-file-alt text-xl"></i></div>
-                            <div><p class="text-xs sm:text-sm text-slate-500 font-medium mb-1">จำนวนใบแจ้งหนี้</p><p id="dash-invoices-count" class="text-xl sm:text-2xl font-bold text-slate-800">0 รายการ</p></div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="p-4 border-b border-slate-200 bg-slate-50">
-                            <h3 class="font-bold text-slate-800">รายการยอดขาย (ใบเสร็จรับเงิน)</h3>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left min-w-[600px]">
-                                <thead class="bg-slate-50 border-b border-slate-200">
-                                    <tr>
-                                        <th class="p-4 font-medium text-slate-600 text-sm whitespace-nowrap">วันที่</th>
-                                        <th class="p-4 font-medium text-slate-600 text-sm whitespace-nowrap">เลขที่เอกสาร</th>
-                                        <th class="p-4 font-medium text-slate-600 text-sm whitespace-nowrap">ลูกค้า</th>
-                                        <th class="p-4 font-medium text-slate-600 text-sm text-right whitespace-nowrap">ยอดรวมสุทธิ</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="dash-sales-tbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- VIEW: DOCUMENTS -->
-                <div id="view-documents" class="view-section hidden space-y-4">
-                    <div id="docs-list-mode" class="space-y-4">
-                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            <div class="flex space-x-1 sm:space-x-2 bg-white p-1 rounded-lg shadow-sm border border-slate-200 w-full overflow-x-auto" id="docs-filter-btns">
-                                <button onclick="window.app.setFilter('ALL')" class="flex-1 px-3 sm:px-5 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all whitespace-nowrap bg-slate-800 text-white shadow">ทั้งหมด</button>
-                                <button onclick="window.app.setFilter('QT')" class="flex-1 px-3 sm:px-5 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100">ใบเสนอราคา</button>
-                                <button onclick="window.app.setFilter('IV')" class="flex-1 px-3 sm:px-5 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100">ใบแจ้งหนี้</button>
-                                <button onclick="window.app.setFilter('RE')" class="flex-1 px-3 sm:px-5 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100">ใบเสร็จ</button>
-                            </div>
-                            <div class="flex space-x-2 w-full md:w-auto">
-                                <button onclick="window.app.openDocForm('QT')" class="flex-1 md:flex-none justify-center flex items-center px-3 sm:px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-bold shadow-sm transition whitespace-nowrap"><i class="fas fa-plus mr-1 sm:mr-2"></i> สร้างใบเสนอราคา</button>
-                                <button onclick="window.app.openDocForm('IV')" class="flex-1 md:flex-none justify-center flex items-center px-3 sm:px-4 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-bold shadow-sm transition whitespace-nowrap"><i class="fas fa-plus mr-1 sm:mr-2"></i> สร้างใบแจ้งหนี้</button>
-                            </div>
-                        </div>
-
-                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div class="overflow-x-auto w-full">
-                                <table class="w-full text-left min-w-[800px]">
-                                    <thead class="bg-slate-50 border-b border-slate-200">
-                                        <tr>
-                                            <th class="p-4 font-medium text-slate-600 text-sm whitespace-nowrap">เลขที่เอกสาร</th>
-                                            <th class="p-4 font-medium text-slate-600 text-sm whitespace-nowrap">ลูกค้า</th>
-                                            <th class="p-4 font-medium text-slate-600 text-sm whitespace-nowrap">วันที่ / ครบกำหนด</th>
-                                            <th class="p-4 font-medium text-slate-600 text-sm text-right whitespace-nowrap">ยอดสุทธิ</th>
-                                            <th class="p-4 font-medium text-slate-600 text-sm text-center whitespace-nowrap">สถานะ</th>
-                                            <th class="p-4 font-medium text-slate-600 text-sm text-center whitespace-nowrap">จัดการ</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="docs-tbody"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="docs-form-mode" class="hidden bg-white rounded-xl shadow-sm border border-slate-200">
-                        <div class="px-4 sm:px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-xl">
-                            <h2 class="text-base sm:text-lg font-bold text-slate-800"><span id="form-doc-title">สร้างเอกสารใหม่</span> <span id="form-doc-id" class="text-emerald-600 ml-1 whitespace-nowrap"></span></h2>
-                            <button type="button" onclick="window.app.closeDocForm()" class="text-slate-400 hover:text-red-500 transition p-1"><i class="fas fa-times text-xl"></i></button>
-                        </div>
-
-                        <form id="document-form" onsubmit="window.app.saveDocument(event)" class="p-4 sm:p-6">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-                                <div class="sm:col-span-2 md:col-span-1">
-                                    <label class="block text-sm font-semibold text-slate-700 mb-1">ลูกค้า</label>
-                                    <div class="flex gap-2">
-                                        <select id="doc-customer" class="doc-input w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed" required></select>
-                                        <button type="button" onclick="window.app.openCustomerModal()" class="doc-input bg-emerald-50 text-emerald-600 px-4 py-2 rounded-lg border border-emerald-200 hover:bg-emerald-100 flex items-center justify-center transition shrink-0" title="เพิ่มลูกค้าใหม่"><i class="fas fa-plus"></i></button>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-1">วันที่ออกเอกสาร</label>
-                                    <input type="date" id="doc-date" class="doc-input w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed" required>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-slate-700 mb-1">วันครบกำหนด</label>
-                                    <input type="date" id="doc-due-date" class="doc-input w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed">
-                                </div>
-                            </div>
-
-                            <div class="mb-6 sm:mb-8 border border-slate-200 rounded-xl overflow-hidden">
-                                <div class="overflow-x-auto">
-                                    <table class="w-full text-left min-w-[700px]">
-                                        <thead class="bg-slate-50 border-b border-slate-200 text-sm text-slate-600">
-                                            <tr>
-                                                <th class="p-3 w-10 text-center">#</th>
-                                                <th class="p-3 w-1/4">ดึงจากระบบ (ไม่บังคับ)</th>
-                                                <th class="p-3 w-1/3">ชื่อรายการ (พิมพ์เองได้)</th>
-                                                <th class="p-3 w-24 text-right">จำนวน</th>
-                                                <th class="p-3 w-32 text-right">ราคาหน่วย</th>
-                                                <th class="p-3 w-32 text-right">รวม</th>
-                                                <th class="p-3 w-12 text-center doc-action-col"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="doc-items-tbody"></tbody>
-                                    </table>
-                                </div>
-                                <div class="p-3 bg-slate-50 border-t border-slate-200 doc-action-col">
-                                    <button type="button" onclick="window.app.addFormItem()" class="text-sm font-bold text-emerald-600 hover:text-emerald-800 flex items-center transition p-1"><i class="fas fa-plus mr-1"></i> เพิ่มรายการสินค้า</button>
-                                </div>
-                            </div>
-
-                            <div class="flex flex-col md:flex-row justify-between items-start gap-6 sm:gap-8">
-                                <div class="w-full md:w-1/2 order-2 md:order-1">
-                                    <label class="block text-sm font-semibold text-slate-700 mb-1">หมายเหตุ</label>
-                                    <textarea id="doc-notes" class="doc-input w-full p-3 border border-slate-300 rounded-xl h-28 focus:ring-2 focus:ring-emerald-400 outline-none transition disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"></textarea>
-                                </div>
-                                
-                                <div class="w-full md:w-1/2 bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200 space-y-3 shadow-inner order-1 md:order-2">
-                                    <div class="flex justify-between text-sm"><span class="text-slate-600 font-medium">รวมเป็นเงิน</span><span id="doc-calc-subtotal" class="font-bold">฿0.00</span></div>
-                                    <div class="flex justify-between items-center text-sm"><span class="text-slate-600 font-medium">ส่วนลด</span><input type="number" id="doc-discount" value="0" oninput="window.app.calcTotals()" class="doc-input w-24 p-2 border border-slate-300 rounded-md text-right focus:ring-2 focus:ring-emerald-400 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"></div>
-                                    <div class="flex justify-between items-center text-sm">
-                                        <label class="flex items-center text-slate-600 font-medium"><input type="checkbox" id="doc-has-vat" checked onchange="window.app.calcTotals()" class="doc-input mr-2 accent-emerald-500 w-4 h-4 disabled:opacity-50"> ภาษีมูลค่าเพิ่ม 7%</label>
-                                        <span id="doc-calc-vat" class="font-bold">฿0.00</span>
-                                    </div>
-                                    <div class="flex justify-between items-center text-sm">
-                                        <label class="flex items-center text-slate-600 font-medium"><input type="checkbox" id="doc-has-wht" onchange="window.app.calcTotals()" class="doc-input mr-2 accent-emerald-500 w-4 h-4 disabled:opacity-50"> หัก ณ ที่จ่าย 
-                                            <select id="doc-wht-rate" onchange="window.app.calcTotals()" class="doc-input ml-2 p-1.5 border border-slate-300 rounded-md text-xs outline-none focus:ring-1 focus:ring-emerald-400 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"><option value="1">1%</option><option value="3" selected>3%</option><option value="5">5%</option></select>
-                                        </label>
-                                        <span id="doc-calc-wht" class="font-bold text-red-600">- ฿0.00</span>
-                                    </div>
-                                    <div class="pt-4 border-t border-slate-300 flex justify-between items-center mt-2">
-                                        <span class="text-base font-bold text-slate-800">ยอดชำระสุทธิ</span>
-                                        <span id="doc-calc-grand" class="text-xl sm:text-2xl font-black text-emerald-600">฿0.00</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="mt-6 sm:mt-8 flex flex-col sm:flex-row justify-end sm:space-x-3 border-t border-slate-200 pt-6 gap-3 sm:gap-0">
-                                <button type="button" id="btn-doc-cancel" onclick="window.app.closeDocForm()" class="w-full sm:w-auto px-6 py-3 sm:py-2.5 border border-slate-300 rounded-lg font-medium text-slate-600 hover:bg-slate-50 transition text-center order-3 sm:order-1">ยกเลิก</button>
-                                <button type="button" id="btn-doc-print" onclick="window.app.openPrintFromForm()" class="hidden w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md transition flex items-center justify-center order-2 sm:order-2"><i class="fas fa-print mr-2"></i> ดูตัวอย่าง / พิมพ์</button>
-                                <button type="submit" id="btn-doc-save" class="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 shadow-md transition flex items-center justify-center order-1 sm:order-3"><i class="fas fa-check-circle mr-2"></i> บันทึกข้อมูล</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- VIEW: ARCHIVE -->
-                <div id="view-old_documents" class="view-section hidden space-y-4">
-                    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div class="flex items-center space-x-2 w-full md:w-auto">
-                            <span class="font-medium text-slate-700 whitespace-nowrap">ค้นหา:</span>
-                            <input type="text" id="old-docs-search" oninput="window.app.renderOldDocuments()" placeholder="เลขที่เอกสาร, ชื่อลูกค้า..." class="w-full p-2 border border-slate-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-emerald-400 md:w-64">
-                        </div>
-                        <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full md:w-auto">
-                            <span class="font-medium text-slate-700 whitespace-nowrap">ช่วงวันที่:</span>
-                            <div class="flex items-center space-x-2 w-full">
-                                <input type="date" id="old-docs-start" onchange="window.app.renderOldDocuments()" class="w-full sm:w-auto p-2 border border-slate-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-emerald-400">
-                                <span class="text-slate-500">-</span>
-                                <input type="date" id="old-docs-end" onchange="window.app.renderOldDocuments()" class="w-full sm:w-auto p-2 border border-slate-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-emerald-400">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="overflow-x-auto w-full">
-                            <table class="w-full text-left min-w-[700px]">
-                                <thead class="bg-slate-50 border-b border-slate-200">
-                                    <tr>
-                                        <th class="p-4 font-medium text-slate-600 text-sm whitespace-nowrap">เลขที่เอกสาร</th>
-                                        <th class="p-4 font-medium text-slate-600 text-sm whitespace-nowrap">ลูกค้า</th>
-                                        <th class="p-4 font-medium text-slate-600 text-sm whitespace-nowrap">วันที่</th>
-                                        <th class="p-4 font-medium text-slate-600 text-sm text-right whitespace-nowrap">ยอดสุทธิ</th>
-                                        <th class="p-4 font-medium text-slate-600 text-sm text-center whitespace-nowrap">สถานะ</th>
-                                        <th class="p-4 font-medium text-slate-600 text-sm text-center whitespace-nowrap">จัดการ</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="old-docs-tbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- VIEW: CUSTOMERS -->
-                <div id="view-customers" class="view-section hidden">
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                            <h3 class="font-bold text-slate-800">ข้อมูลลูกค้า</h3>
-                            <button onclick="window.app.openCustomerModal()" class="px-3 sm:px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-bold border border-emerald-200 hover:bg-emerald-100 flex items-center transition"><i class="fas fa-plus mr-1 sm:mr-2"></i> <span class="hidden sm:inline">เพิ่มลูกค้า</span><span class="sm:hidden">เพิ่ม</span></button>
-                        </div>
-                        <div class="overflow-x-auto w-full">
-                            <table class="w-full text-left text-sm min-w-[600px]">
-                                <thead class="bg-white border-b border-slate-200"><tr><th class="p-4 text-slate-500 font-semibold whitespace-nowrap">รหัส</th><th class="p-4 text-slate-500 font-semibold whitespace-nowrap">ชื่อ</th><th class="p-4 text-slate-500 font-semibold whitespace-nowrap">เบอร์โทร</th><th class="p-4 text-slate-500 font-semibold whitespace-nowrap">อีเมล</th></tr></thead>
-                                <tbody id="customers-tbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- VIEW: PRODUCTS -->
-                <div id="view-products" class="view-section hidden">
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="p-4 sm:p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                            <h3 class="font-bold text-slate-800">ข้อมูลสินค้า/บริการ</h3>
-                            <button onclick="window.app.openProductModal()" class="px-3 sm:px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-bold border border-emerald-200 hover:bg-emerald-100 flex items-center transition"><i class="fas fa-plus mr-1 sm:mr-2"></i> <span class="hidden sm:inline">เพิ่มรายการ</span><span class="sm:hidden">เพิ่ม</span></button>
-                        </div>
-                        <div class="overflow-x-auto w-full">
-                            <table class="w-full text-left text-sm min-w-[500px]"><thead class="bg-white border-b border-slate-200"><tr><th class="p-4 text-slate-500 font-semibold whitespace-nowrap">รหัส</th><th class="p-4 text-slate-500 font-semibold whitespace-nowrap">ชื่อ</th><th class="p-4 text-slate-500 font-semibold text-right whitespace-nowrap">ราคา</th></tr></thead>
-                            <tbody id="products-tbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- VIEW: EMPLOYEES -->
-                <div id="view-employees" class="view-section hidden space-y-4">
-                    <div class="bg-gradient-to-r from-emerald-800 to-emerald-600 rounded-2xl shadow-lg p-5 sm:p-6 text-white flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
-                        <div class="absolute right-0 top-0 opacity-10 pointer-events-none text-[100px] sm:text-[150px] leading-none transform translate-x-8 -translate-y-8"><i class="fas fa-user-shield"></i></div>
-                        <div class="relative z-10 text-center md:text-left">
-                            <h2 class="text-xl sm:text-2xl font-bold mb-1">จัดการพนักงานและสิทธิ์การใช้งาน</h2>
-                            <p class="text-emerald-100 text-sm">ส่วนนี้สำหรับผู้ดูแลระบบ (Admin) เท่านั้น</p>
-                        </div>
-                        <div class="relative z-10 w-full md:w-auto">
-                            <button onclick="window.app.openEmployeeModal()" class="w-full md:w-auto px-6 py-3 bg-white text-emerald-800 rounded-xl font-bold hover:bg-emerald-50 hover:scale-105 transition-all duration-200 shadow-md flex items-center justify-center">
-                                <i class="fas fa-user-plus text-xl mr-2"></i> เพิ่มพนักงานใหม่
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="overflow-x-auto w-full">
-                            <table class="w-full text-left text-sm min-w-[600px]">
-                                <thead class="bg-slate-50 border-b border-slate-200">
-                                    <tr>
-                                        <th class="p-4 text-slate-500 font-semibold whitespace-nowrap">ชื่อ-นามสกุล</th>
-                                        <th class="p-4 text-slate-500 font-semibold whitespace-nowrap">อีเมล/Username</th>
-                                        <th class="p-4 text-slate-500 font-semibold text-center whitespace-nowrap">ระดับสิทธิ์</th>
-                                        <th class="p-4 text-slate-500 font-semibold text-center whitespace-nowrap">จัดการ</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="employees-tbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- VIEW: SETTINGS -->
-                <div id="view-settings" class="view-section hidden">
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 sm:p-8 max-w-2xl mx-auto md:mx-0">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-slate-200 pb-4 gap-4">
-                            <h3 class="font-bold text-slate-800 text-lg sm:text-xl">ตั้งค่าข้อมูลบริษัท</h3>
-                            <button onclick="window.app.saveSettings()" class="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 shadow-md transition flex items-center justify-center">
-                                <i class="fas fa-save mr-2"></i> บันทึกการตั้งค่า
-                            </button>
-                        </div>
-                        <div class="space-y-5">
-                            <div class="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                <label class="block text-sm font-semibold mb-2 text-slate-700">โลโก้บริษัท <span class="block sm:inline text-xs text-amber-500 font-normal mt-1 sm:mt-0 sm:ml-2">(เมื่ออัปโหลดหรือลบ กรุณากดปุ่มบันทึก)</span></label>
-                                <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
-                                    <div id="set-logo-wrapper" class="relative group hidden">
-                                        <img id="set-logo-img" src="" class="h-20 w-auto object-contain border border-slate-200 p-1 bg-white rounded-lg shadow-sm bg-center">
-                                        <button onclick="window.app.clearLogo()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 shadow transition sm:opacity-0 sm:group-hover:opacity-100"><i class="fas fa-times"></i></button>
-                                    </div>
-                                    <div id="set-logo-empty" class="h-20 w-28 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400 text-xs bg-white font-medium shrink-0">ไม่มีโลโก้</div>
-                                    <input type="file" onchange="window.app.handleLogoUpload(event)" accept="image/*" class="w-full sm:flex-1 p-2 border border-slate-200 rounded-lg text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-emerald-100 file:text-emerald-700 hover:file:bg-emerald-200 cursor-pointer transition bg-white">
-                                </div>
-                            </div>
-                            <div><label class="block text-sm font-semibold mb-1 text-slate-700">ชื่อบริษัท</label><input type="text" id="set-name" class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition"></div>
-                            <div><label class="block text-sm font-semibold mb-1 text-slate-700">ที่อยู่</label><textarea id="set-address" class="w-full p-2.5 border border-slate-300 rounded-lg h-24 focus:ring-2 focus:ring-emerald-400 outline-none transition"></textarea></div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                <div><label class="block text-sm font-semibold mb-1 text-slate-700">เลขผู้เสียภาษี</label><input type="text" id="set-taxId" class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition"></div>
-                                <div><label class="block text-sm font-semibold mb-1 text-slate-700">เบอร์โทร</label><input type="text" id="set-phone" class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition"></div>
-                            </div>
-                            <div><label class="block text-sm font-semibold mb-1 text-slate-700">อีเมล</label><input type="email" id="set-email" class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition"></div>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-        </main>
-    </div>
-
-    <!-- ================== MODALS ================== -->
-    <!-- Modal: Customer -->
-    <div id="modal-customer" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col">
-            <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0 sticky top-0 z-10">
-                <h3 class="font-bold text-lg text-emerald-800">เพิ่มข้อมูลลูกค้า</h3>
-                <button type="button" onclick="window.app.closeCustomerModal()" class="text-slate-400 hover:text-red-500 transition p-1"><i class="fas fa-times text-xl"></i></button>
-            </div>
-            <form onsubmit="window.app.saveCustomer(event)" class="p-5 sm:p-6 space-y-4">
-                <div><label class="block text-sm font-medium mb-1 text-slate-700">ชื่อลูกค้า</label><input type="text" id="cust-name" class="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 transition" required></div>
-                <div><label class="block text-sm font-medium mb-1 text-slate-700">ที่อยู่</label><textarea id="cust-addr" class="w-full p-2.5 border border-slate-300 rounded-lg h-20 outline-none focus:ring-2 focus:ring-emerald-400 transition"></textarea></div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div><label class="block text-sm font-medium mb-1 text-slate-700">เลขผู้เสียภาษี</label><input type="text" id="cust-tax" class="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 transition"></div>
-                    <div><label class="block text-sm font-medium mb-1 text-slate-700">เบอร์โทรศัพท์</label><input type="text" id="cust-phone" class="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 transition"></div>
-                </div>
-                <div><label class="block text-sm font-medium mb-1 text-slate-700">อีเมล</label><input type="email" id="cust-email" class="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 transition"></div>
-                <div class="pt-4 flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-0 sm:space-x-3">
-                    <button type="button" onclick="window.app.closeCustomerModal()" class="w-full sm:w-auto px-5 py-3 sm:py-2 border border-slate-300 rounded-lg font-medium text-slate-600 hover:bg-slate-50 transition text-center">ยกเลิก</button>
-                    <button type="submit" class="w-full sm:w-auto px-5 py-3 sm:py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 shadow-md transition flex items-center justify-center"><i class="fas fa-save mr-2"></i> บันทึก</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal: Product -->
-    <div id="modal-product" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col">
-            <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0 sticky top-0 z-10">
-                <h3 class="font-bold text-lg text-emerald-800">เพิ่มข้อมูลสินค้า/บริการ</h3>
-                <button type="button" onclick="window.app.closeProductModal()" class="text-slate-400 hover:text-red-500 transition p-1"><i class="fas fa-times text-xl"></i></button>
-            </div>
-            <form onsubmit="window.app.saveProduct(event)" class="p-5 sm:p-6 space-y-4">
-                <div><label class="block text-sm font-medium mb-1 text-slate-700">รหัสสินค้า</label><input type="text" id="prod-code" class="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 transition" required></div>
-                <div><label class="block text-sm font-medium mb-1 text-slate-700">ชื่อรายการ</label><input type="text" id="prod-name" class="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 transition" required></div>
-                <div><label class="block text-sm font-medium mb-1 text-slate-700">ราคาต่อหน่วย</label><input type="number" step="0.01" id="prod-price" class="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 transition" required></div>
-                <div class="pt-4 flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-0 sm:space-x-3">
-                    <button type="button" onclick="window.app.closeProductModal()" class="w-full sm:w-auto px-5 py-3 sm:py-2 border border-slate-300 rounded-lg font-medium text-slate-600 hover:bg-slate-50 transition text-center">ยกเลิก</button>
-                    <button type="submit" class="w-full sm:w-auto px-5 py-3 sm:py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 shadow-md transition flex items-center justify-center"><i class="fas fa-save mr-2"></i> บันทึก</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal: Employee -->
-    <div id="modal-employee" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col">
-            <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0 sticky top-0 z-10">
-                <h3 class="font-bold text-lg text-emerald-800">เพิ่มพนักงานเข้าระบบ</h3>
-                <button type="button" onclick="window.app.closeEmployeeModal()" class="text-slate-400 hover:text-red-500 transition p-1"><i class="fas fa-times text-xl"></i></button>
-            </div>
-            <form onsubmit="window.app.saveEmployee(event)" class="p-5 sm:p-6 space-y-4">
-                <div><label class="block text-sm font-medium mb-1 text-slate-700">ชื่อ-นามสกุล</label><input type="text" id="emp-name" class="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 transition" required></div>
-                <div><label class="block text-sm font-medium mb-1 text-slate-700">อีเมล/Username สำหรับเข้าสู่ระบบ</label><input type="email" id="emp-email" class="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 transition" required></div>
-                <div><label class="block text-sm font-medium mb-1 text-slate-700">ตั้งรหัสผ่าน (ใช้สำหรับระบบนี้เท่านั้น)</label><input type="password" id="emp-pass" class="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 transition" required minlength="4"></div>
-                <div>
-                    <label class="block text-sm font-medium mb-1 text-slate-700">ระดับสิทธิ์</label>
-                    <select id="emp-role" class="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 transition">
-                        <option value="employee">พนักงานทั่วไป</option>
-                        <option value="admin">ผู้ดูแลระบบ (Admin)</option>
-                    </select>
-                </div>
-                <div class="pt-4 flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-0 sm:space-x-3">
-                    <button type="button" onclick="window.app.closeEmployeeModal()" class="w-full sm:w-auto px-5 py-3 sm:py-2 border border-slate-300 rounded-lg font-medium text-slate-600 hover:bg-slate-50 transition text-center">ยกเลิก</button>
-                    <button type="submit" class="w-full sm:w-auto px-5 py-3 sm:py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 shadow-md transition flex items-center justify-center"><i class="fas fa-save mr-2"></i> บันทึก</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- ================== Firebase & SPA Logic ================== -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Firebase Config
-        const firebaseConfig = {
-            apiKey: "AIzaSyD5PoZ4QcAo7mBspIscnsO6cnUxGPyY7iQ",
-            authDomain: "cdz-doc.firebaseapp.com",
-            projectId: "cdz-doc",
-            storageBucket: "cdz-doc.firebasestorage.app",
-            messagingSenderId: "236255831921",
-            appId: "1:236255831921:web:48076c3fdc410b653d78d0"
-        };
-        
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const publicPath = `artifacts/${firebaseConfig.projectId}/public/data`;
-
-        // Global State
-        window.app = window.app || {};
-        window.appState = {
-            company: { name: '', address: '', taxId: '', phone: '', email: '', logo: '' },
-            customers: [], products: [], documents: [], employees: [],
-            currentView: 'dashboard', docFilter: 'ALL',
-            selectedMonth: new Date().toISOString().slice(0, 7),
-            isFormOpen: false, isEditMode: false, isViewOnly: false,
-            currentDocType: 'QT', currentDocId: '', currentDocRefId: null, currentDocStatus: 'Pending',
-            formItems: [], docTotals: { subtotal: 0, vatAmount: 0, whtAmount: 0, grandTotal: 0 },
-            printDocData: null,
-            isSetupMode: false, 
-            currentUser: null,
-            listeners: []
-        };
-
-        const formatNum = (num) => Number(num || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
-        const formatDate = (d) => d && d.split('-').length >= 3 ? `${d.split('-')[2].substring(0, 2)}/${d.split('-')[1]}/${d.split('-')[0]}` : d || '';
-        const el = (id) => document.getElementById(id);
-        const getCustomer = (id) => window.appState.customers.find(c => c.id === id) || {};
-
-        // --- Custom Authentication System ---
-        async function initCustomAuth() {
-            const savedUser = localStorage.getItem('custom_auth_user');
-            if (savedUser) {
-                window.appState.currentUser = JSON.parse(savedUser);
-                el('view-auth').classList.add('hidden');
-                el('main-layout').classList.remove('hidden');
-                setupRealtimeListeners();
-            } else {
-                try {
-                    const snap = await getDocs(collection(db, publicPath, 'employees'));
-                    if (snap.empty) {
-                        window.appState.isSetupMode = true;
-                        el('auth-title').textContent = 'สร้างบัญชีผู้ดูแลระบบ (Admin)';
-                        el('auth-submit-btn').textContent = 'สร้างบัญชี Admin';
-                        el('setup-name-field').classList.remove('hidden');
-                        el('auth-toggle-btn').classList.add('hidden'); 
-                        Swal.fire({ title: 'ตั้งค่าการใช้งานครั้งแรก', text: 'ระบบยังไม่มีผู้ดูแล กรุณาสร้างบัญชี Admin ก่อนเริ่มใช้งาน', icon: 'info' });
-                    } else {
-                        window.appState.isSetupMode = false;
-                        el('auth-title').textContent = 'เข้าสู่ระบบ';
-                        el('auth-submit-btn').textContent = 'เข้าสู่ระบบ';
-                        el('setup-name-field').classList.add('hidden');
-                        el('auth-toggle-btn').classList.remove('hidden'); 
-                    }
-                } catch (e) {
-                    console.error("Firebase connection error:", e);
-                }
-                el('global-loading').classList.add('hidden');
-                el('view-auth').classList.remove('hidden');
-            }
-        }
-
-        window.app.toggleSetupMode = () => {
-            window.appState.isSetupMode = !window.appState.isSetupMode;
-            if(window.appState.isSetupMode) {
-                el('auth-title').textContent = 'สร้างบัญชีผู้ดูแลระบบ (Admin)';
-                el('auth-submit-btn').textContent = 'สร้างบัญชี Admin';
-                el('setup-name-field').classList.remove('hidden');
-                el('auth-toggle-btn').innerHTML = '<i class="fas fa-sign-in-alt mr-1"></i> มีบัญชีแล้ว? เข้าสู่ระบบ';
-            } else {
-                el('auth-title').textContent = 'เข้าสู่ระบบ';
-                el('auth-submit-btn').textContent = 'เข้าสู่ระบบ';
-                el('setup-name-field').classList.add('hidden');
-                el('auth-toggle-btn').innerHTML = '<i class="fas fa-cog mr-1"></i> สำหรับการใช้งานครั้งแรก (สร้าง Admin)';
-            }
-        };
-
-        window.app.handleAuth = async (e) => {
-            e.preventDefault();
-            const email = el('auth-email').value;
-            const pass = el('auth-pass').value;
-            const name = el('auth-name') ? el('auth-name').value : 'Admin';
-            
-            try {
-                Swal.fire({ title: 'กำลังประมวลผล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-                
-                if (window.appState.isSetupMode) {
-                    const snap = await getDocs(collection(db, publicPath, 'employees'));
-                    if (snap.docs.some(d => d.data().email === email)) {
-                        Swal.fire('ข้อผิดพลาด', 'อีเมลนี้ถูกใช้งานไปแล้ว', 'error'); return;
-                    }
-                    const newId = 'E' + Date.now().toString().slice(-6);
-                    const userData = { id: newId, name: name, email: email, password: pass, role: 'admin', createdAt: new Date().toISOString() };
-                    await setDoc(doc(db, publicPath, 'employees', newId), userData);
-                    
-                    localStorage.setItem('custom_auth_user', JSON.stringify(userData));
-                    window.appState.currentUser = userData;
-                    Swal.close(); location.reload();
-                } else {
-                    const snap = await getDocs(collection(db, publicPath, 'employees'));
-                    const userDoc = snap.docs.find(d => d.data().email === email && d.data().password === pass);
-                    
-                    if (userDoc) {
-                        const userData = { id: userDoc.id, ...userDoc.data() };
-                        localStorage.setItem('custom_auth_user', JSON.stringify(userData));
-                        window.appState.currentUser = userData;
-                        Swal.close(); location.reload();
-                    } else {
-                        Swal.fire('ข้อผิดพลาด', 'อีเมลหรือรหัสผ่านไม่ถูกต้อง', 'error');
-                    }
-                }
-            } catch (err) {
-                console.error(err); Swal.fire('ข้อผิดพลาด', 'เกิดข้อผิดพลาด กรุณาลองใหม่', 'error');
-            }
-        };
-
-        window.app.logout = () => {
-            Swal.fire({
-                title: 'ยืนยันการออกจากระบบ?', icon: 'question', showCancelButton: true,
-                confirmButtonColor: '#059669', cancelButtonColor: '#94a3b8',
-                confirmButtonText: 'ออกจากระบบ', cancelButtonText: 'ยกเลิก'
-            }).then((result) => { 
-                if (result.isConfirmed) { localStorage.removeItem('custom_auth_user'); location.reload(); } 
-            });
-        };
-
-        // --- REALTIME DATABASE ---
-        function setupRealtimeListeners() {
-            el('global-loading').classList.add('hidden');
-            window.app.switchView('dashboard'); 
-            
-            el('header-user-name').textContent = window.appState.currentUser.name;
-            if (window.appState.currentUser.role === 'admin') el('nav-employees').classList.remove('hidden');
-
-            const unsubSettings = onSnapshot(doc(db, publicPath, 'settings', 'profile'), (docSnap) => {
-                if(docSnap.exists()) window.appState.company = docSnap.data();
-                renderSettings();
-            });
-
-            const unsubCust = onSnapshot(collection(db, publicPath, 'customers'), (snap) => {
-                window.appState.customers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                renderCustomers(); renderCustomerDropdown();
-            });
-
-            const unsubProd = onSnapshot(collection(db, publicPath, 'products'), (snap) => {
-                window.appState.products = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                renderProducts(); renderFormItems(); 
-            });
-
-            const unsubDocs = onSnapshot(collection(db, publicPath, 'documents'), (snap) => {
-                window.appState.documents = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => b.id.localeCompare(a.id));
-                renderDashboard(); renderDocuments(); window.app.renderOldDocuments();
-            });
-
-            const unsubEmp = onSnapshot(collection(db, publicPath, 'employees'), (snap) => {
-                window.appState.employees = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                if (!window.appState.employees.find(e => e.id === window.appState.currentUser.id)) {
-                    localStorage.removeItem('custom_auth_user');
-                    alert("บัญชีของคุณถูกลบออกจากระบบ"); location.reload();
-                } else {
-                    const me = window.appState.employees.find(e => e.id === window.appState.currentUser.id);
-                    if(me && me.role !== window.appState.currentUser.role) {
-                        window.appState.currentUser.role = me.role;
-                        localStorage.setItem('custom_auth_user', JSON.stringify(window.appState.currentUser));
-                        if(me.role === 'admin') el('nav-employees').classList.remove('hidden');
-                        else el('nav-employees').classList.add('hidden');
-                    }
-                }
-                renderEmployees();
-            });
-
-            window.appState.listeners.push(unsubSettings, unsubCust, unsubProd, unsubDocs, unsubEmp);
-        }
-
-        // --- RENDER FUNCTIONS ---
-        function renderSettings() {
-            const comp = window.appState.company;
-            el('header-company-name').textContent = comp.name || 'ไม่ระบุชื่อบริษัท';
-            
-            if(el('set-name')) el('set-name').value = comp.name || '';
-            if(el('set-address')) el('set-address').value = comp.address || '';
-            if(el('set-taxId')) el('set-taxId').value = comp.taxId || '';
-            if(el('set-phone')) el('set-phone').value = comp.phone || '';
-            if(el('set-email')) el('set-email').value = comp.email || '';
-            
-            if (comp.logo) {
-                el('set-logo-img').src = comp.logo;
-                el('set-logo-wrapper').classList.remove('hidden');
-                el('set-logo-empty').classList.add('hidden');
-            } else {
-                el('set-logo-wrapper').classList.add('hidden');
-                el('set-logo-empty').classList.remove('hidden');
-            }
-        }
-
-        function renderCustomers() {
-            const tbody = el('customers-tbody');
-            if(!tbody) return;
-            tbody.innerHTML = window.appState.customers.map(c => `
-                <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
-                    <td class="p-4 text-emerald-600 font-medium whitespace-nowrap">${c.id}</td>
-                    <td class="p-4 font-semibold whitespace-nowrap">${c.name}</td>
-                    <td class="p-4 whitespace-nowrap">${c.phone || '-'}</td>
-                    <td class="p-4 whitespace-nowrap">${c.email || '-'}</td>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left min-w-[800px] text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+              <tr><th className="p-4 font-medium">เลขที่เอกสาร</th><th className="p-4 font-medium">ลูกค้า</th><th className="p-4 font-medium">วันที่</th><th className="p-4 font-medium text-right">ยอดสุทธิ</th><th className="p-4 font-medium text-center">สถานะ</th><th className="p-4 font-medium text-center">จัดการ</th></tr>
+            </thead>
+            <tbody>
+              {filteredDocs.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-slate-500">ไม่มีเอกสาร</td></tr> : filteredDocs.map(doc => (
+                <tr key={doc.id} className="border-b border-slate-100 hover:bg-slate-50">
+                  <td className="p-4">
+                    <div className="font-bold text-emerald-600">{doc.id}</div>
+                    {doc.refId && <div className="text-[11px] text-slate-400">อ้างอิง: {doc.refId}</div>}
+                  </td>
+                  <td className="p-4 font-medium text-slate-800">{getCustomer(doc.customerId).name || 'ไม่ระบุ'}</td>
+                  <td className="p-4 text-slate-600">{formatDate(doc.date)}</td>
+                  <td className="p-4 font-bold text-slate-800 text-right">฿{formatNum(doc.grandTotal)}</td>
+                  <td className="p-4 text-center">{getStatusBadge(doc.status)}</td>
+                  <td className="p-4 flex items-center justify-center space-x-1.5">
+                    <button onClick={() => onPrint(doc)} title="พิมพ์" className="p-1.5 text-slate-500 hover:text-emerald-600 bg-slate-100 hover:bg-emerald-50 rounded"><Printer size={16}/></button>
+                    <button onClick={() => editDoc(doc)} title="แก้ไข" className="p-1.5 text-slate-500 hover:text-amber-600 bg-slate-100 hover:bg-amber-50 rounded"><Edit size={16}/></button>
+                    {doc.type === 'QT' && doc.status !== 'Invoiced' && <button onClick={() => convertDoc(doc, 'IV')} title="แปลงเป็นใบแจ้งหนี้" className="p-1.5 text-slate-500 hover:text-teal-600 bg-slate-100 hover:bg-teal-50 rounded text-xs font-bold flex items-center"><ArrowRight size={14}/> IV</button>}
+                    {doc.type === 'IV' && doc.status !== 'Paid' && <button onClick={() => convertDoc(doc, 'RE')} title="รับชำระ" className="px-2 py-1.5 text-white bg-emerald-500 hover:bg-emerald-600 rounded text-xs font-bold flex items-center"><DollarSign size={14}/> จ่าย</button>}
+                  </td>
                 </tr>
-            `).join('');
-        }
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-        function renderCustomerDropdown() {
-            const sel = el('doc-customer');
-            if(!sel) return;
-            const currentVal = sel.value;
-            sel.innerHTML = `<option value="" disabled>-- เลือกลูกค้า --</option>` + window.appState.customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-            if(currentVal) sel.value = currentVal;
-        }
+function OldDocumentsView({ documents, getCustomer, onPrint }) {
+  const [search, setSearch] = useState('');
+  
+  const filtered = useMemo(() => {
+    return documents.filter(d => {
+      if (!search) return true;
+      const s = search.toLowerCase();
+      const cName = (getCustomer(d.customerId).name || '').toLowerCase();
+      return d.id.toLowerCase().includes(s) || cName.includes(s);
+    });
+  }, [documents, search, getCustomer]);
 
-        function renderProducts() {
-            const tbody = el('products-tbody');
-            if(!tbody) return;
-            tbody.innerHTML = window.appState.products.map(p => `
-                <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
-                    <td class="p-4 text-emerald-600 font-medium whitespace-nowrap">${p.code}</td>
-                    <td class="p-4 font-semibold whitespace-nowrap">${p.name}</td>
-                    <td class="p-4 font-bold text-right whitespace-nowrap">฿${formatNum(p.price)}</td>
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 flex items-center">
+        <span className="font-medium text-slate-700 mr-2">ค้นหา:</span>
+        <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="เลขที่เอกสาร, ชื่อลูกค้า..." className="p-2 border border-slate-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-emerald-400 w-full max-w-md" />
+      </div>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left min-w-[700px] text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+              <tr><th className="p-4 font-medium">เลขที่เอกสาร</th><th className="p-4 font-medium">ลูกค้า</th><th className="p-4 font-medium">วันที่</th><th className="p-4 font-medium text-right">ยอดสุทธิ</th><th className="p-4 font-medium text-center">จัดการ</th></tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? <tr><td colSpan="5" className="p-8 text-center text-slate-500">ไม่พบเอกสาร</td></tr> : filtered.map(doc => (
+                <tr key={doc.id} className="border-b border-slate-100 hover:bg-slate-50">
+                  <td className="p-4 font-bold text-slate-700">{doc.id}</td>
+                  <td className="p-4 font-medium text-slate-700">{getCustomer(doc.customerId).name || '-'}</td>
+                  <td className="p-4 text-slate-600">{formatDate(doc.date)}</td>
+                  <td className="p-4 font-bold text-slate-700 text-right">฿{formatNum(doc.grandTotal)}</td>
+                  <td className="p-4 text-center">
+                    <button onClick={() => onPrint(doc)} className="p-1.5 text-slate-500 hover:text-emerald-600 bg-slate-100 rounded"><Printer size={16}/></button>
+                  </td>
                 </tr>
-            `).join('');
-        }
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-        function renderEmployees() {
-            const tbody = el('employees-tbody');
-            if(!tbody) return;
-            const currentUid = window.appState.currentUser ? window.appState.currentUser.id : null;
-            tbody.innerHTML = window.appState.employees.map(emp => `
-                <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
-                    <td class="p-4 font-semibold whitespace-nowrap text-slate-800">${emp.name} ${emp.id === currentUid ? '<span class="text-xs text-blue-500 font-normal ml-1">(คุณ)</span>' : ''}</td>
-                    <td class="p-4 text-slate-600 whitespace-nowrap">${emp.email}</td>
-                    <td class="p-4 text-center whitespace-nowrap"><span class="px-2 py-1 text-xs font-bold rounded ${emp.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}">${emp.role === 'admin' ? 'Admin' : 'พนักงาน'}</span></td>
-                    <td class="p-4 text-center whitespace-nowrap">${emp.id !== currentUid ? `<button type="button" onclick="window.app.deleteEmployee('${emp.id}')" title="ลบผู้ใช้" class="p-1.5 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition"><i class="fas fa-trash"></i></button>` : '-'}</td>
+// --- FORM COMPONENT ---
+function DocumentForm({ type, initialData, customers, products, onClose, onPrint }) {
+  const isViewOnly = initialData?._isViewOnly || false;
+  const isEditMode = !!initialData && !isViewOnly && !initialData.refId; // refId means it's a conversion, so treat as new creation visually for ID. Actually let's just show ID.
+
+  const generateId = (t) => {
+    const d = new Date().toISOString().slice(2, 7).replace('-', '');
+    return `${t}-${d}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`; // Simple mock ID gen for React
+  };
+
+  const [doc, setDocData] = useState(initialData || {
+    id: generateId(type), type: type, status: type === 'QT' ? 'Pending' : type === 'IV' ? 'Unpaid' : 'Paid',
+    customerId: '', date: new Date().toISOString().split('T')[0], dueDate: '',
+    items: [{ productId: '', name: '', qty: 1, price: 0 }], discount: 0, hasVat: true, hasWht: false, whtRate: 3, notes: ''
+  });
+
+  const totals = useMemo(() => {
+    let subtotal = doc.items.reduce((s, i) => s + (Number(i.qty) * Number(i.price)), 0);
+    const discount = Number(doc.discount) || 0;
+    const afterDis = subtotal - discount;
+    const vat = doc.hasVat ? afterDis * 0.07 : 0;
+    const wht = doc.hasWht ? afterDis * (doc.whtRate / 100) : 0;
+    return { subtotal, discount, vatAmount: vat, whtAmount: wht, grandTotal: afterDis + vat - wht };
+  }, [doc.items, doc.discount, doc.hasVat, doc.hasWht, doc.whtRate]);
+
+  const handleItemChange = (idx, field, val) => {
+    const newItems = [...doc.items];
+    newItems[idx][field] = val;
+    if (field === 'productId') {
+      const p = products.find(x => x.id === val);
+      if (p) { newItems[idx].name = p.name; newItems[idx].price = p.price; }
+    }
+    setDocData({ ...doc, items: newItems });
+  };
+
+  const saveToDb = async (e) => {
+    e.preventDefault();
+    if (!doc.customerId) return Swal.fire('แจ้งเตือน', 'กรุณาเลือกลูกค้า', 'warning');
+    if (doc.items.length === 0) return Swal.fire('แจ้งเตือน', 'กรุณาเพิ่มรายการสินค้า', 'warning');
+
+    const finalDoc = {
+      ...doc,
+      items: doc.items.map(i => ({ productId: i.productId||'', name: i.name, qty: Number(i.qty), price: Number(i.price) })),
+      ...totals
+    };
+    // remove temp flag
+    delete finalDoc._isViewOnly;
+
+    try {
+      Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading() });
+      // Saving logic
+      // Create doc id if new. For simplicity, we just setDoc.
+      await setDoc(doc(db, publicPath, 'documents', finalDoc.id), finalDoc);
+      
+      // Update Ref Status
+      if (finalDoc.refId) {
+        if(finalDoc.type === 'IV') await setDoc(doc(db, publicPath, 'documents', finalDoc.refId), { status: 'Invoiced' }, {merge: true});
+        if(finalDoc.type === 'RE') await setDoc(doc(db, publicPath, 'documents', finalDoc.refId), { status: 'Paid' }, {merge: true});
+      }
+      
+      Swal.fire({ title: 'สำเร็จ', icon: 'success', timer: 1000, showConfirmButton: false });
+      onClose();
+    } catch (err) {
+      Swal.fire('ข้อผิดพลาด', 'บันทึกไม่สำเร็จ', 'error');
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+      <div className="px-5 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-xl">
+        <h2 className="text-lg font-bold text-slate-800">{isViewOnly ? 'รายละเอียดเอกสาร' : isEditMode ? 'แก้ไขเอกสาร' : 'สร้างเอกสารใหม่'} <span className="text-emerald-600">({doc.id})</span></h2>
+        <button onClick={onClose} className="text-slate-400 hover:text-red-500"><X size={20}/></button>
+      </div>
+      <form onSubmit={saveToDb} className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="md:col-span-1">
+            <label className="block text-sm font-semibold mb-1">ลูกค้า</label>
+            <select value={doc.customerId} onChange={e => setDocData({...doc, customerId: e.target.value})} disabled={isViewOnly} className="w-full p-2.5 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-emerald-400" required>
+              <option value="" disabled>-- เลือกลูกค้า --</option>
+              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div><label className="block text-sm font-semibold mb-1">วันที่ออกเอกสาร</label><input type="date" value={doc.date} onChange={e => setDocData({...doc, date: e.target.value})} disabled={isViewOnly} className="w-full p-2.5 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-emerald-400" required /></div>
+          <div><label className="block text-sm font-semibold mb-1">วันครบกำหนด</label><input type="date" value={doc.dueDate || ''} onChange={e => setDocData({...doc, dueDate: e.target.value})} disabled={isViewOnly} className="w-full p-2.5 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-emerald-400" /></div>
+        </div>
+
+        <div className="border border-slate-200 rounded-lg overflow-hidden mb-6">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr><th className="p-3 w-10 text-center">#</th><th className="p-3 w-1/4">เลือกจากระบบ</th><th className="p-3 w-1/3">ชื่อรายการ (พิมพ์ได้)</th><th className="p-3 w-20 text-right">จำนวน</th><th className="p-3 w-28 text-right">ราคา</th><th className="p-3 w-28 text-right">รวม</th>{!isViewOnly && <th className="p-3 w-10"></th>}</tr>
+            </thead>
+            <tbody>
+              {doc.items.map((item, idx) => (
+                <tr key={idx} className="border-b border-slate-100">
+                  <td className="p-2 text-center text-slate-400">{idx+1}</td>
+                  <td className="p-2"><select value={item.productId} onChange={e => handleItemChange(idx, 'productId', e.target.value)} disabled={isViewOnly} className="w-full p-2 border border-slate-300 rounded outline-none"><option value="">- พิมพ์เอง -</option>{products.map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}</select></td>
+                  <td className="p-2"><input type="text" value={item.name} onChange={e => handleItemChange(idx, 'name', e.target.value)} disabled={isViewOnly} className="w-full p-2 border border-slate-300 rounded outline-none" required /></td>
+                  <td className="p-2"><input type="number" min="1" value={item.qty} onChange={e => handleItemChange(idx, 'qty', e.target.value)} disabled={isViewOnly} className="w-full p-2 border border-slate-300 rounded outline-none text-right" required /></td>
+                  <td className="p-2"><input type="number" min="0" value={item.price} onChange={e => handleItemChange(idx, 'price', e.target.value)} disabled={isViewOnly} className="w-full p-2 border border-slate-300 rounded outline-none text-right" required /></td>
+                  <td className="p-3 text-right font-bold text-slate-700">฿{formatNum(item.qty * item.price)}</td>
+                  {!isViewOnly && <td className="p-2 text-center"><button type="button" onClick={() => setDocData({...doc, items: doc.items.filter((_,i)=>i!==idx)})} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button></td>}
                 </tr>
-            `).join('');
-        }
+              ))}
+            </tbody>
+          </table>
+          {!isViewOnly && <div className="p-2 bg-slate-50"><button type="button" onClick={() => setDocData({...doc, items: [...doc.items, {productId:'', name:'', qty:1, price:0}]})} className="text-sm font-bold text-emerald-600 flex items-center"><Plus size={16} className="mr-1"/>เพิ่มรายการ</button></div>}
+        </div>
 
-        function getStatusInfo(status) {
-            const map = {
-                'Pending': { t: 'รอดำเนินการ', c: 'bg-amber-100 text-amber-700 border-amber-200' },
-                'Invoiced': { t: 'ออกบิลแล้ว', c: 'bg-teal-100 text-teal-700 border-teal-200' },
-                'Unpaid': { t: 'รอชำระเงิน', c: 'bg-orange-100 text-orange-700 border-orange-200' },
-                'Paid': { t: 'ชำระแล้ว', c: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
-            };
-            return map[status] || { t: status, c: 'bg-slate-100 text-slate-700' };
-        }
+        <div className="flex flex-col md:flex-row gap-6">
+          <div className="w-full md:w-1/2">
+            <label className="block text-sm font-semibold mb-1">หมายเหตุ</label>
+            <textarea value={doc.notes} onChange={e => setDocData({...doc, notes: e.target.value})} disabled={isViewOnly} className="w-full p-3 border border-slate-300 rounded-lg h-28 outline-none" />
+          </div>
+          <div className="w-full md:w-1/2 bg-slate-50 p-5 rounded-lg border border-slate-200 space-y-3">
+            <div className="flex justify-between text-sm"><span className="text-slate-600">รวมเป็นเงิน</span><span className="font-bold">฿{formatNum(totals.subtotal)}</span></div>
+            <div className="flex justify-between items-center text-sm"><span className="text-slate-600">ส่วนลด</span><input type="number" value={doc.discount} onChange={e => setDocData({...doc, discount: e.target.value})} disabled={isViewOnly} className="w-24 p-1.5 border border-slate-300 rounded text-right outline-none" /></div>
+            <div className="flex justify-between items-center text-sm">
+              <label className="flex items-center text-slate-600"><input type="checkbox" checked={doc.hasVat} onChange={e => setDocData({...doc, hasVat: e.target.checked})} disabled={isViewOnly} className="mr-2" /> ภาษี 7%</label>
+              <span className="font-bold">฿{formatNum(totals.vatAmount)}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <label className="flex items-center text-slate-600"><input type="checkbox" checked={doc.hasWht} onChange={e => setDocData({...doc, hasWht: e.target.checked})} disabled={isViewOnly} className="mr-2" /> หัก ณ ที่จ่าย 
+                <select value={doc.whtRate} onChange={e => setDocData({...doc, whtRate: e.target.value})} disabled={isViewOnly} className="ml-2 p-1 border rounded text-xs"><option value="1">1%</option><option value="3">3%</option><option value="5">5%</option></select>
+              </label>
+              <span className="font-bold text-red-600">- ฿{formatNum(totals.whtAmount)}</span>
+            </div>
+            <div className="pt-3 border-t border-slate-300 flex justify-between items-center"><span className="font-bold text-slate-800">ยอดชำระสุทธิ</span><span className="text-xl font-black text-emerald-600">฿{formatNum(totals.grandTotal)}</span></div>
+          </div>
+        </div>
 
-        function buildDocRows(docs, allowActions = true) {
-            if(docs.length === 0) return `<tr><td colspan="6" class="p-10 text-center text-slate-500">ไม่มีเอกสาร</td></tr>`;
-            return docs.map(doc => {
-                const custName = getCustomer(doc.customerId).name || 'ไม่ระบุ';
-                const sInfo = getStatusInfo(doc.status);
-                let actionsHtml = `<button type="button" onclick="window.app.openPrintView('${doc.id}')" title="ดูตัวอย่าง / พิมพ์" class="p-2 sm:p-1.5 text-slate-500 hover:text-emerald-600 bg-slate-100 hover:bg-emerald-50 rounded-lg transition"><i class="fas fa-print"></i></button>`;
-                
-                if (allowActions) {
-                    actionsHtml += `<button type="button" onclick="window.app.editDoc('${doc.id}')" title="แก้ไข" class="p-2 sm:p-1.5 text-slate-500 hover:text-amber-600 bg-slate-100 hover:bg-amber-50 rounded-lg transition"><i class="fas fa-edit"></i></button>`;
-                    if(doc.type === 'QT' && doc.status !== 'Invoiced') actionsHtml += `<button type="button" onclick="window.app.convertDoc('${doc.id}', 'IV')" title="แปลงเป็นใบแจ้งหนี้" class="p-2 sm:p-1.5 text-slate-500 hover:text-teal-600 bg-slate-100 hover:bg-teal-50 rounded-lg text-xs font-bold transition flex items-center"><i class="fas fa-arrow-right sm:mr-1"></i> <span class="hidden sm:inline">IV</span></button>`;
-                    if(doc.type === 'IV' && doc.status !== 'Paid') actionsHtml += `<button type="button" onclick="window.app.convertDoc('${doc.id}', 'RE')" title="รับชำระ" class="p-2 sm:p-1.5 text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg text-xs font-bold shadow-sm transition sm:px-2 flex items-center"><i class="fas fa-dollar-sign sm:mr-1"></i> <span class="hidden sm:inline">จ่าย</span></button>`;
-                } else {
-                    actionsHtml += `<button type="button" onclick="window.app.viewDoc('${doc.id}')" title="ดูรายละเอียด" class="p-2 sm:p-1.5 text-slate-500 hover:text-amber-600 bg-slate-100 hover:bg-amber-50 rounded-lg transition"><i class="fas fa-eye"></i></button>`;
-                }
+        <div className="mt-6 flex justify-end gap-3 border-t pt-5">
+          <button type="button" onClick={onClose} className="px-5 py-2.5 border rounded-lg text-slate-600 hover:bg-slate-50 font-medium">ปิด</button>
+          {(isEditMode || isViewOnly) && <button type="button" onClick={() => onPrint({...doc, ...totals})} className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 flex items-center"><Printer size={16} className="mr-2"/> พิมพ์</button>}
+          {!isViewOnly && <button type="submit" className="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 flex items-center"><CheckCircle size={16} className="mr-2"/> บันทึก</button>}
+        </div>
+      </form>
+    </div>
+  );
+}
 
-                return `
-                <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
-                    <td class="p-4"><div class="font-bold ${allowActions ? 'text-emerald-600' : 'text-slate-700'} whitespace-nowrap">${doc.id}</div>${doc.refId ? `<div class="text-xs text-slate-400 font-medium whitespace-nowrap">อ้างอิง: ${doc.refId}</div>` : ''}</td>
-                    <td class="p-4 text-sm font-medium text-slate-800">${custName}</td>
-                    <td class="p-4 text-sm text-slate-600 whitespace-nowrap">${formatDate(doc.date)}${allowActions && doc.dueDate ? `<div class="text-xs text-slate-400">Due: ${formatDate(doc.dueDate)}</div>` : ''}</td>
-                    <td class="p-4 text-sm font-bold text-slate-800 text-right whitespace-nowrap">฿${formatNum(doc.grandTotal)}</td>
-                    <td class="p-4 text-center whitespace-nowrap"><span class="px-3 py-1 text-xs font-bold rounded-full border ${sInfo.c}">${sInfo.t}</span></td>
-                    <td class="p-4 flex items-center justify-center space-x-2">${actionsHtml}</td>
-                </tr>`;
-            }).join('');
-        }
+// --- MASTER DATA VIEWS ---
+function CustomersView({ customers }) {
+  const saveCust = async (e) => {
+    e.preventDefault();
+    const id = 'C' + Date.now().toString().slice(-6);
+    const data = { name: e.target.name.value, phone: e.target.phone.value, email: e.target.email.value, taxId: e.target.tax.value, address: e.target.addr.value };
+    await setDoc(doc(db, publicPath, 'customers', id), data);
+    Swal.fire('สำเร็จ', 'เพิ่มลูกค้าแล้ว', 'success');
+    document.getElementById('modal-add-cust').close();
+  };
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+      <div className="p-4 border-b flex justify-between items-center bg-slate-50"><h3 className="font-bold text-slate-800">ลูกค้า</h3><button onClick={() => document.getElementById('modal-add-cust').showModal()} className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded text-sm font-bold border border-emerald-200"><Plus size={16} className="inline mr-1"/>เพิ่ม</button></div>
+      <table className="w-full text-left text-sm">
+        <thead className="bg-white border-b"><tr><th className="p-3">รหัส</th><th className="p-3">ชื่อ</th><th className="p-3">โทร</th><th className="p-3">อีเมล</th></tr></thead>
+        <tbody>{customers.map(c => <tr key={c.id} className="border-b hover:bg-slate-50"><td className="p-3 text-emerald-600">{c.id}</td><td className="p-3 font-semibold">{c.name}</td><td className="p-3">{c.phone}</td><td className="p-3">{c.email}</td></tr>)}</tbody>
+      </table>
+      <dialog id="modal-add-cust" className="p-6 rounded-xl shadow-2xl backdrop:bg-slate-900/50 w-full max-w-sm">
+        <h3 className="font-bold text-lg mb-4 text-emerald-800">เพิ่มลูกค้า</h3>
+        <form onSubmit={saveCust} className="space-y-3">
+          <input type="text" name="name" placeholder="ชื่อ" required className="w-full p-2 border rounded outline-none" />
+          <input type="text" name="phone" placeholder="เบอร์โทร" className="w-full p-2 border rounded outline-none" />
+          <input type="email" name="email" placeholder="อีเมล" className="w-full p-2 border rounded outline-none" />
+          <input type="text" name="tax" placeholder="เลขผู้เสียภาษี" className="w-full p-2 border rounded outline-none" />
+          <textarea name="addr" placeholder="ที่อยู่" className="w-full p-2 border rounded outline-none"></textarea>
+          <div className="flex justify-end gap-2 mt-4"><button type="button" onClick={() => document.getElementById('modal-add-cust').close()} className="px-4 py-2 bg-slate-100 rounded">ยกเลิก</button><button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded">บันทึก</button></div>
+        </form>
+      </dialog>
+    </div>
+  );
+}
 
-        function renderDashboard() {
-            if(!el('dash-total-sales')) return;
-            const m = window.appState.selectedMonth;
-            if(el('dash-month')) el('dash-month').value = m;
+function ProductsView({ products }) {
+  const saveProd = async (e) => {
+    e.preventDefault();
+    const id = 'P' + Date.now().toString().slice(-6);
+    const data = { code: e.target.code.value, name: e.target.name.value, price: Number(e.target.price.value) };
+    await setDoc(doc(db, publicPath, 'products', id), data);
+    Swal.fire('สำเร็จ', 'เพิ่มสินค้าแล้ว', 'success');
+    document.getElementById('modal-add-prod').close();
+  };
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+      <div className="p-4 border-b flex justify-between items-center bg-slate-50"><h3 className="font-bold text-slate-800">สินค้า/บริการ</h3><button onClick={() => document.getElementById('modal-add-prod').showModal()} className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded text-sm font-bold border border-emerald-200"><Plus size={16} className="inline mr-1"/>เพิ่ม</button></div>
+      <table className="w-full text-left text-sm">
+        <thead className="bg-white border-b"><tr><th className="p-3">รหัส</th><th className="p-3">ชื่อรายการ</th><th className="p-3 text-right">ราคา</th></tr></thead>
+        <tbody>{products.map(p => <tr key={p.id} className="border-b hover:bg-slate-50"><td className="p-3 text-emerald-600">{p.code}</td><td className="p-3 font-semibold">{p.name}</td><td className="p-3 text-right font-bold">฿{formatNum(p.price)}</td></tr>)}</tbody>
+      </table>
+      <dialog id="modal-add-prod" className="p-6 rounded-xl shadow-2xl backdrop:bg-slate-900/50 w-full max-w-sm">
+        <h3 className="font-bold text-lg mb-4 text-emerald-800">เพิ่มสินค้า/บริการ</h3>
+        <form onSubmit={saveProd} className="space-y-3">
+          <input type="text" name="code" placeholder="รหัสสินค้า" required className="w-full p-2 border rounded outline-none" />
+          <input type="text" name="name" placeholder="ชื่อรายการ" required className="w-full p-2 border rounded outline-none" />
+          <input type="number" step="0.01" name="price" placeholder="ราคา" required className="w-full p-2 border rounded outline-none" />
+          <div className="flex justify-end gap-2 mt-4"><button type="button" onClick={() => document.getElementById('modal-add-prod').close()} className="px-4 py-2 bg-slate-100 rounded">ยกเลิก</button><button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded">บันทึก</button></div>
+        </form>
+      </dialog>
+    </div>
+  );
+}
 
-            const dashDocs = window.appState.documents.filter(d => d.date.startsWith(m));
-            const reDocs = dashDocs.filter(d => d.type === 'RE');
-            const ivDocs = dashDocs.filter(d => d.type === 'IV');
-            
-            el('dash-total-sales').textContent = `฿${formatNum(reDocs.reduce((s, d) => s + d.grandTotal, 0))}`;
-            el('dash-receipts-count').textContent = `${reDocs.length} รายการ`;
-            el('dash-pending-amount').textContent = `฿${formatNum(ivDocs.filter(d => d.status === 'Unpaid').reduce((s, d) => s + d.grandTotal, 0))}`;
-            el('dash-invoices-count').textContent = `${ivDocs.length} รายการ`;
+function EmployeesView({ employees, currentUser }) {
+  const saveEmp = async (e) => {
+    e.preventDefault();
+    const id = 'E' + Date.now().toString().slice(-6);
+    const data = { name: e.target.name.value, email: e.target.email.value, password: e.target.pass.value, role: e.target.role.value };
+    await setDoc(doc(db, publicPath, 'employees', id), data);
+    Swal.fire('สำเร็จ', 'เพิ่มพนักงานแล้ว', 'success');
+    document.getElementById('modal-add-emp').close();
+  };
+  const deleteEmp = async (id) => {
+    if(confirm('ลบพนักงาน?')) await deleteDoc(doc(db, publicPath, 'employees', id));
+  };
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+      <div className="p-4 border-b flex justify-between items-center bg-slate-50"><h3 className="font-bold text-slate-800">พนักงาน (Admin Only)</h3><button onClick={() => document.getElementById('modal-add-emp').showModal()} className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded text-sm font-bold border border-emerald-200"><Plus size={16} className="inline mr-1"/>เพิ่ม</button></div>
+      <table className="w-full text-left text-sm">
+        <thead className="bg-white border-b"><tr><th className="p-3">ชื่อ</th><th className="p-3">อีเมล</th><th className="p-3 text-center">สิทธิ์</th><th className="p-3 text-center">จัดการ</th></tr></thead>
+        <tbody>{employees.map(e => <tr key={e.id} className="border-b hover:bg-slate-50"><td className="p-3 font-semibold">{e.name} {e.id===currentUser.id&&'(คุณ)'}</td><td className="p-3">{e.email}</td><td className="p-3 text-center"><span className="px-2 py-1 bg-slate-100 rounded text-xs font-bold">{e.role}</span></td><td className="p-3 text-center">{e.id!==currentUser.id && <button onClick={()=>deleteEmp(e.id)} className="text-red-500"><Trash2 size={16}/></button>}</td></tr>)}</tbody>
+      </table>
+      <dialog id="modal-add-emp" className="p-6 rounded-xl shadow-2xl backdrop:bg-slate-900/50 w-full max-w-sm">
+        <h3 className="font-bold text-lg mb-4 text-emerald-800">เพิ่มพนักงาน</h3>
+        <form onSubmit={saveEmp} className="space-y-3">
+          <input type="text" name="name" placeholder="ชื่อ" required className="w-full p-2 border rounded outline-none" />
+          <input type="email" name="email" placeholder="อีเมล (ใช้ล็อกอิน)" required className="w-full p-2 border rounded outline-none" />
+          <input type="text" name="pass" placeholder="รหัสผ่าน" required className="w-full p-2 border rounded outline-none" />
+          <select name="role" className="w-full p-2 border rounded outline-none"><option value="employee">พนักงาน</option><option value="admin">Admin</option></select>
+          <div className="flex justify-end gap-2 mt-4"><button type="button" onClick={() => document.getElementById('modal-add-emp').close()} className="px-4 py-2 bg-slate-100 rounded">ยกเลิก</button><button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded">บันทึก</button></div>
+        </form>
+      </dialog>
+    </div>
+  );
+}
 
-            el('dash-sales-tbody').innerHTML = reDocs.length === 0 ? `<tr><td colspan="4" class="p-8 text-center text-slate-500">ไม่มีข้อมูลยอดขายในเดือนที่เลือก</td></tr>` : reDocs.map(doc => `
-                <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                    <td class="p-4 text-sm text-slate-600 whitespace-nowrap">${formatDate(doc.date)}</td>
-                    <td class="p-4 text-sm font-semibold text-emerald-600 whitespace-nowrap">${doc.id}</td>
-                    <td class="p-4 text-sm text-slate-800 font-medium whitespace-nowrap">${getCustomer(doc.customerId).name}</td>
-                    <td class="p-4 text-sm font-bold text-emerald-600 text-right whitespace-nowrap">฿${formatNum(doc.grandTotal)}</td>
+function SettingsView({ company }) {
+  const saveSet = async (e) => {
+    e.preventDefault();
+    const data = { name: e.target.name.value, address: e.target.addr.value, taxId: e.target.tax.value, phone: e.target.phone.value, email: e.target.email.value, logo: company.logo||'' };
+    await setDoc(doc(db, publicPath, 'settings', 'profile'), data);
+    Swal.fire('สำเร็จ', 'บันทึกตั้งค่าแล้ว', 'success');
+  };
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-2xl">
+      <h3 className="font-bold text-lg mb-4 border-b pb-2">ตั้งค่าบริษัท</h3>
+      <form onSubmit={saveSet} className="space-y-4">
+        <div><label className="block text-sm font-bold mb-1">ชื่อบริษัท</label><input type="text" name="name" defaultValue={company.name} className="w-full p-2 border rounded outline-none focus:ring-2 focus:ring-emerald-400" /></div>
+        <div><label className="block text-sm font-bold mb-1">ที่อยู่</label><textarea name="addr" defaultValue={company.address} className="w-full p-2 border rounded outline-none focus:ring-2 focus:ring-emerald-400 h-20" /></div>
+        <div className="grid grid-cols-2 gap-4">
+          <div><label className="block text-sm font-bold mb-1">เลขผู้เสียภาษี</label><input type="text" name="tax" defaultValue={company.taxId} className="w-full p-2 border rounded outline-none focus:ring-2 focus:ring-emerald-400" /></div>
+          <div><label className="block text-sm font-bold mb-1">เบอร์โทร</label><input type="text" name="phone" defaultValue={company.phone} className="w-full p-2 border rounded outline-none focus:ring-2 focus:ring-emerald-400" /></div>
+        </div>
+        <div><label className="block text-sm font-bold mb-1">อีเมล</label><input type="email" name="email" defaultValue={company.email} className="w-full p-2 border rounded outline-none focus:ring-2 focus:ring-emerald-400" /></div>
+        <button type="submit" className="w-full py-3 bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700">บันทึก</button>
+      </form>
+    </div>
+  );
+}
+
+// --- PRINT COMPONENT ---
+function PrintView({ doc: data, company, customer, onClose }) {
+  useEffect(() => { window.print(); }, []);
+  const docTitleMap = { 'QT': 'ใบเสนอราคา', 'IV': 'ใบส่งของ / ใบกำกับภาษี', 'RE': 'ใบเสร็จรับเงิน' };
+
+  return (
+    <div className="fixed inset-0 bg-slate-800 z-50 overflow-auto flex flex-col items-center py-8">
+      <div className="no-print bg-white p-3 rounded-lg shadow-lg flex space-x-3 mb-6 sticky top-4">
+        <button onClick={() => window.print()} className="px-4 py-2 bg-blue-600 text-white rounded font-bold"><Printer size={16} className="inline mr-2"/>พิมพ์ / Save PDF</button>
+        <button onClick={onClose} className="px-4 py-2 bg-slate-200 rounded font-bold"><X size={16} className="inline mr-2"/>ปิด</button>
+      </div>
+
+      <div className="bg-white text-slate-800 flex flex-col justify-between shadow-xl origin-top scale-[0.45] md:scale-100 print:scale-100 print:shadow-none" style={{width: '210mm', minHeight: '297mm', padding: '15mm', boxSizing: 'border-box'}}>
+        <div>
+          <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-4">
+            <div className="flex items-start gap-4">
+              {company.logo ? <img src={company.logo} className="h-14 max-w-[160px] object-contain"/> : <div className="w-14 h-14 bg-emerald-600 text-white flex items-center justify-center font-bold rounded">LOGO</div>}
+              <div>
+                <h1 className="text-lg font-bold text-emerald-900 leading-tight mb-1">{company.name}</h1>
+                <p className="text-[11px] whitespace-pre-wrap">{company.address}</p>
+                <p className="text-[11px]">เลขประจำตัวผู้เสียภาษี: {company.taxId}</p>
+                <p className="text-[11px]">โทร: {company.phone} | อีเมล: {company.email}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <h2 className="text-xl font-bold mb-2">{docTitleMap[data.type]}</h2>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm bg-slate-50 p-2 rounded border text-left min-w-[160px]">
+                <span className="font-semibold">เลขที่:</span><span className="font-bold">{data.id}</span>
+                <span className="font-semibold">วันที่:</span><span>{formatDate(data.date)}</span>
+                {data.refId && <><span className="font-semibold">อ้างอิง:</span><span>{data.refId}</span></>}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-between mb-4 gap-4">
+            <div className="flex-1 border p-2.5 rounded min-h-[80px]">
+              <h3 className="text-[11px] font-bold text-slate-500 border-b pb-1 mb-1">ลูกค้า (Customer)</h3>
+              <p className="font-bold text-sm">{customer.name}</p>
+              <p className="text-xs mt-1">{customer.address}</p>
+              <p className="text-[11px] mt-1">เลขประจำตัวผู้เสียภาษี: {customer.taxId}</p>
+              <p className="text-[11px] mt-1">โทร: {customer.phone || '-'} | อีเมล: {customer.email || '-'}</p>
+            </div>
+            <div className="w-[30%] border p-2.5 rounded min-h-[80px] flex flex-col justify-center text-sm">
+              <div className="flex justify-between mb-1"><span className="text-[11px] text-slate-500">เงื่อนไขชำระ:</span><span className="text-[11px] font-medium">30 วัน</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-500">วันครบกำหนด:</span><span className="text-[11px] font-medium">{formatDate(data.dueDate) || '-'}</span></div>
+            </div>
+          </div>
+
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-slate-100 border-y-2 border-slate-400">
+                <th className="py-1.5 px-2 text-center w-12 border-r border-white">ลำดับ</th>
+                <th className="py-1.5 px-2 text-left border-r border-white">รายละเอียดสินค้า/บริการ</th>
+                <th className="py-1.5 px-2 text-right w-20 border-r border-white">จำนวน</th>
+                <th className="py-1.5 px-2 text-right w-24 border-r border-white">ราคา/หน่วย</th>
+                <th className="py-1.5 px-2 text-right w-28">จำนวนเงิน</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.items.map((item, idx) => (
+                <tr key={idx} className="border-b border-slate-200">
+                  <td className="py-1.5 px-2 text-center border-r border-white">{idx+1}</td>
+                  <td className="py-1.5 px-2 font-medium border-r border-white">{item.name}</td>
+                  <td className="py-1.5 px-2 text-right border-r border-white">{item.qty}</td>
+                  <td className="py-1.5 px-2 text-right border-r border-white">{formatNum(item.price)}</td>
+                  <td className="py-1.5 px-2 text-right font-bold">{formatNum(item.qty * item.price)}</td>
                 </tr>
-            `).join('');
-        }
+              ))}
+              {[...Array(Math.max(0, 5 - data.items.length))].map((_, i) => <tr key={`f-${i}`}><td colSpan="5" className="py-3 border-b border-slate-50"></td></tr>)}
+            </tbody>
+          </table>
+        </div>
 
-        function renderDocuments() {
-            const tbody = el('docs-tbody');
-            if(!tbody) return;
-            const filter = window.appState.docFilter;
-            tbody.innerHTML = buildDocRows(window.appState.documents.filter(d => filter === 'ALL' || d.type === filter), true);
-
-            document.querySelectorAll('#docs-filter-btns button').forEach((btn, idx) => {
-                const types = ['ALL', 'QT', 'IV', 'RE'];
-                btn.className = types[idx] === filter ? "flex-1 px-3 sm:px-5 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all whitespace-nowrap bg-slate-800 text-white shadow" : "flex-1 px-3 sm:px-5 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100";
-            });
-        }
-
-        window.app.renderOldDocuments = function() {
-            const search = el('old-docs-search')?.value.toLowerCase() || '';
-            const start = el('old-docs-start')?.value || '';
-            const end = el('old-docs-end')?.value || '';
-            const tbody = el('old-docs-tbody');
-            if(!tbody) return;
-
-            tbody.innerHTML = buildDocRows(window.appState.documents.filter(d => {
-                if (start && d.date < start) return false;
-                if (end && d.date > end) return false;
-                if (search && !d.id.toLowerCase().includes(search) && !(getCustomer(d.customerId).name || '').toLowerCase().includes(search)) return false;
-                return true;
-            }), false);
-        };
-
-        function renderFormItems() {
-            const tbody = el('doc-items-tbody');
-            const isViewOnly = window.appState.isViewOnly;
-            const disAttr = isViewOnly ? 'disabled class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-100 text-slate-500 cursor-not-allowed"' : 'class="w-full p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 outline-none"';
-            const numDisAttr = isViewOnly ? 'disabled class="w-full p-2 border border-slate-300 rounded-lg text-sm text-right bg-slate-100 text-slate-500 cursor-not-allowed"' : 'class="w-full p-2 border border-slate-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-emerald-300 outline-none"';
-
-            let prodOptions = `<option value="">- พิมพ์เอง -</option>` + window.appState.products.map(p => `<option value="${p.id}">${p.code} - ${p.name}</option>`).join('');
-
-            tbody.innerHTML = window.appState.formItems.map((item, idx) => `
-                <tr class="border-b border-slate-100" data-index="${idx}">
-                    <td class="p-3 text-sm text-slate-500 text-center">${idx + 1}</td>
-                    <td class="p-2"><select data-field="productId" ${disAttr}>${prodOptions.replace(`value="${item.productId}"`, `value="${item.productId}" selected`)}</select></td>
-                    <td class="p-2"><input type="text" data-field="name" value="${item.name}" ${disAttr} required></td>
-                    <td class="p-2"><input type="number" min="1" data-field="qty" value="${item.qty}" ${numDisAttr} required></td>
-                    <td class="p-2"><input type="number" min="0" data-field="price" value="${item.price}" ${numDisAttr} required></td>
-                    <td class="p-3 text-right text-sm font-bold text-slate-700" id="row-tot-${idx}">฿${formatNum(item.qty * item.price)}</td>
-                    <td class="p-2 text-center doc-action-col">${!isViewOnly ? `<button type="button" onclick="window.app.removeFormItem(${idx})" class="text-red-400 hover:text-red-600 transition p-2"><i class="fas fa-trash"></i></button>` : ''}</td>
-                </tr>
-            `).join('');
-            
-            document.querySelectorAll('.doc-action-col').forEach(e => isViewOnly ? e.classList.add('hidden') : e.classList.remove('hidden'));
-            window.app.calcTotals();
-        }
-
-        el('doc-items-tbody')?.addEventListener('input', (e) => {
-            if(window.appState.isViewOnly) return;
-            const tr = e.target.closest('tr');
-            if(!tr) return;
-            const idx = parseInt(tr.dataset.index);
-            const field = e.target.dataset.field;
-            if (idx !== undefined && field) {
-                if (field === 'productId') {
-                    const p = window.appState.products.find(x => x.id === e.target.value);
-                    if (p) {
-                        window.appState.formItems[idx].productId = p.id;
-                        window.appState.formItems[idx].name = p.name;
-                        window.appState.formItems[idx].price = p.price;
-                        renderFormItems(); 
-                    }
-                } else {
-                    window.appState.formItems[idx][field] = e.target.value;
-                    window.app.calcTotals(); 
-                    el(`row-tot-${idx}`).textContent = `฿${formatNum(window.appState.formItems[idx].qty * window.appState.formItems[idx].price)}`;
-                }
-            }
-        });
-
-        window.app.calcTotals = function() {
-            let subtotal = 0;
-            window.appState.formItems.forEach(i => subtotal += (Number(i.qty) * Number(i.price)));
-            const discount = Number(el('doc-discount')?.value) || 0;
-            const afterDiscount = subtotal - discount;
-            const hasVat = el('doc-has-vat')?.checked;
-            const vatAmount = hasVat ? afterDiscount * 0.07 : 0;
-            const hasWht = el('doc-has-wht')?.checked;
-            const whtRate = Number(el('doc-wht-rate')?.value) || 3;
-            const whtAmount = hasWht ? afterDiscount * (whtRate / 100) : 0;
-            const grandTotal = afterDiscount + vatAmount - whtAmount;
-
-            window.appState.docTotals = { subtotal, discount, hasVat, vatAmount, hasWht, whtRate, whtAmount, grandTotal };
-
-            if(el('doc-calc-subtotal')) el('doc-calc-subtotal').textContent = `฿${formatNum(subtotal)}`;
-            if(el('doc-calc-vat')) el('doc-calc-vat').textContent = `฿${formatNum(vatAmount)}`;
-            if(el('doc-calc-wht')) el('doc-calc-wht').textContent = `- ฿${formatNum(whtAmount)}`;
-            if(el('doc-calc-grand')) el('doc-calc-grand').textContent = `฿${formatNum(grandTotal)}`;
-        };
-
-        window.app.addFormItem = function() { window.appState.formItems.push({ productId: '', name: '', qty: 1, price: 0 }); renderFormItems(); };
-        window.app.removeFormItem = function(idx) { window.appState.formItems.splice(idx, 1); renderFormItems(); };
-
-        function generateId(type) {
-            const d = new Date().toISOString().slice(2, 7).replace('-', '');
-            const count = window.appState.documents.filter(x => x.type === type && x.id.includes(d)).length + 1;
-            return `${type}-${d}${count.toString().padStart(3, '0')}`;
-        }
-
-        function populateFormFields(docData, isViewOnly) {
-            window.appState.currentDocId = docData.id; window.appState.currentDocType = docData.type;
-            window.appState.currentDocStatus = docData.status; window.appState.currentDocRefId = docData.refId || null;
-            window.appState.formItems = JSON.parse(JSON.stringify(docData.items || [])); window.appState.isViewOnly = isViewOnly;
-
-            el('form-doc-title').textContent = isViewOnly ? 'รายละเอียดเอกสาร' : (window.appState.isEditMode ? 'แก้ไขเอกสาร' : 'สร้างเอกสารใหม่');
-            el('form-doc-id').textContent = `(${docData.id})`;
-            
-            el('doc-customer').value = docData.customerId || ''; el('doc-date').value = docData.date || '';
-            el('doc-due-date').value = docData.dueDate || ''; el('doc-notes').value = docData.notes || '';
-            el('doc-discount').value = docData.discount || 0; el('doc-has-vat').checked = docData.hasVat !== false;
-            el('doc-has-wht').checked = !!docData.hasWht; el('doc-wht-rate').value = docData.whtRate || 3;
-
-            document.querySelectorAll('.doc-input').forEach(e => e.disabled = isViewOnly);
-            el('btn-new-customer').classList.toggle('hidden', isViewOnly); el('btn-doc-save').classList.toggle('hidden', isViewOnly);
-            el('btn-doc-cancel').textContent = isViewOnly ? 'ปิดหน้าต่าง' : 'ยกเลิก';
-            renderFormItems();
-        }
-
-        window.app.openDocForm = function(type) {
-            window.appState.isFormOpen = true; window.appState.isEditMode = false;
-            populateFormFields({
-                id: generateId(type), type: type, status: type === 'QT' ? 'Pending' : (type === 'IV' ? 'Unpaid' : 'Paid'),
-                customerId: '', date: new Date().toISOString().split('T')[0], dueDate: '',
-                items: [{ productId: '', name: '', qty: 1, price: 0 }], discount: 0, hasVat: true, hasWht: false, whtRate: 3, notes: ''
-            }, false);
-            el('docs-list-mode').classList.add('hidden'); el('docs-form-mode').classList.remove('hidden');
-        };
-
-        window.app.editDoc = function(docId) {
-            const doc = window.appState.documents.find(d => d.id === docId);
-            if(!doc) return;
-            window.appState.isFormOpen = true; window.appState.isEditMode = true;
-            populateFormFields(doc, false);
-            el('docs-list-mode').classList.add('hidden'); el('docs-form-mode').classList.remove('hidden');
-        };
-
-        window.app.viewDoc = function(docId) {
-            const doc = window.appState.documents.find(d => d.id === docId);
-            if(!doc) return;
-            window.appState.isFormOpen = true; window.appState.isEditMode = false;
-            populateFormFields(doc, true);
-            el('docs-list-mode').classList.add('hidden'); el('docs-form-mode').classList.remove('hidden');
-        };
-
-        window.app.convertDoc = function(docId, newType) {
-            const oldDoc = window.appState.documents.find(d => d.id === docId);
-            if(!oldDoc) return;
-            window.appState.isFormOpen = true; window.appState.isEditMode = false;
-            let newDoc = JSON.parse(JSON.stringify(oldDoc));
-            newDoc.id = generateId(newType); newDoc.type = newType;
-            newDoc.status = newType === 'IV' ? 'Unpaid' : 'Paid'; newDoc.date = new Date().toISOString().split('T')[0]; newDoc.refId = oldDoc.id;
-            populateFormFields(newDoc, false);
-            el('docs-list-mode').classList.add('hidden'); el('docs-form-mode').classList.remove('hidden');
-        };
-
-        window.app.closeDocForm = function() {
-            window.appState.isFormOpen = false;
-            el('docs-form-mode').classList.add('hidden'); el('docs-list-mode').classList.remove('hidden');
-        };
-
-        window.app.saveDocument = async function(e) {
-            e.preventDefault();
-            const custId = el('doc-customer').value;
-            if(!custId) return Swal.fire('แจ้งเตือน', 'กรุณาเลือกลูกค้า', 'warning');
-            if(window.appState.formItems.length === 0) return Swal.fire('แจ้งเตือน', 'กรุณาเพิ่มรายการสินค้า', 'warning');
-
-            const docData = {
-                id: window.appState.currentDocId, type: window.appState.currentDocType, status: window.appState.currentDocStatus,
-                customerId: custId, date: el('doc-date').value, dueDate: el('doc-due-date').value || '', notes: el('doc-notes').value || '',
-                items: window.appState.formItems.map(i => ({ productId: i.productId||'', name: i.name, qty: Number(i.qty), price: Number(i.price) })),
-                ...window.appState.docTotals, refId: window.appState.currentDocRefId
-            };
-
-            try {
-                await setDoc(doc(db, publicPath, 'documents', docData.id), docData);
-                if (docData.refId) {
-                    if(docData.type === 'IV') await setDoc(doc(db, publicPath, 'documents', docData.refId), { status: 'Invoiced' }, {merge: true});
-                    if(docData.type === 'RE') await setDoc(doc(db, publicPath, 'documents', docData.refId), { status: 'Paid' }, {merge: true});
-                }
-                Swal.fire({ title: 'สำเร็จ', text: 'บันทึกข้อมูลเรียบร้อย', icon: 'success', timer: 1500, showConfirmButton: false });
-                window.app.closeDocForm();
-            } catch (err) { Swal.fire('ข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้', 'error'); }
-        };
-
-        // --- Print System ---
-        window.app.openPrintFromForm = function() {
-            window.app.calcTotals(); 
-            const docData = {
-                id: window.appState.currentDocId, type: window.appState.currentDocType, status: window.appState.currentDocStatus,
-                customerId: el('doc-customer').value, date: el('doc-date').value, dueDate: el('doc-due-date').value,
-                notes: el('doc-notes').value, items: window.appState.formItems, ...window.appState.docTotals, refId: window.appState.currentDocRefId
-            };
-            window.appState.printDocData = docData; populatePrintDOM(docData);
-            el('print-modal').classList.remove('hidden'); el('main-layout').classList.add('hidden');
-        };
-
-        window.app.openPrintView = function(docId) {
-            const docData = window.appState.documents.find(d => d.id === docId);
-            if(!docData) return;
-            window.appState.printDocData = docData; populatePrintDOM(docData);
-            el('print-modal').classList.remove('hidden'); el('main-layout').classList.add('hidden');
-        };
-
-        function populatePrintDOM(docData) {
-            const comp = window.appState.company; const cust = getCustomer(docData.customerId);
-            if (comp.logo) { el('print-logo').src = comp.logo; el('print-logo').classList.remove('hidden'); el('print-logo-placeholder').classList.add('hidden'); }
-            else { el('print-logo').classList.add('hidden'); el('print-logo-placeholder').classList.remove('hidden'); }
-            
-            el('print-company-name').textContent = comp.name || ''; el('print-company-address').textContent = comp.address || '';
-            el('print-company-tax').textContent = comp.taxId || ''; el('print-company-phone').textContent = comp.phone || ''; el('print-company-email').textContent = comp.email || '';
-
-            el('print-doc-title').textContent = docData.type === 'QT' ? 'ใบเสนอราคา' : (docData.type === 'IV' ? 'ใบส่งของ / ใบกำกับภาษี' : 'ใบเสร็จรับเงิน');
-            el('print-doc-id').textContent = docData.id; el('print-doc-date').textContent = formatDate(docData.date);
-            if(docData.refId) { el('print-ref-label').classList.remove('hidden'); el('print-doc-ref').textContent = docData.refId; el('print-doc-ref').classList.remove('hidden'); }
-            else { el('print-ref-label').classList.add('hidden'); el('print-doc-ref').classList.add('hidden'); }
-
-            el('print-cust-name').textContent = cust.name || '-'; el('print-cust-addr').textContent = cust.address || '-';
-            el('print-cust-tax').textContent = cust.taxId || '-'; el('print-cust-phone').textContent = cust.phone || '-'; el('print-cust-email').textContent = cust.email || '-';
-            el('print-doc-due').textContent = docData.dueDate ? formatDate(docData.dueDate) : '-';
-
-            el('print-items-tbody').innerHTML = docData.items.map((i, idx) => `
-                <tr class="border-b border-slate-200">
-                    <td class="py-1.5 px-2 text-center border-r border-white">${idx + 1}</td>
-                    <td class="py-1.5 px-2 border-r border-white font-medium">${i.name}</td>
-                    <td class="py-1.5 px-2 text-right border-r border-white">${i.qty}</td>
-                    <td class="py-1.5 px-2 text-right border-r border-white">${formatNum(i.price)}</td>
-                    <td class="py-1.5 px-2 text-right font-medium">${formatNum(i.qty * i.price)}</td>
-                </tr>
-            `).join('');
-            el('print-doc-notes').textContent = docData.notes || '-';
-            docData.type === 'RE' ? el('print-stamp-paid').classList.remove('hidden') : el('print-stamp-paid').classList.add('hidden');
-
-            el('print-totals-tbody').innerHTML = `
-                <tr><td class="py-1 text-slate-600">รวมเป็นเงิน</td><td class="py-1 text-right">฿${formatNum(docData.subtotal)}</td></tr>
-                ${docData.discount > 0 ? `<tr><td class="py-1 text-slate-600">หักส่วนลด</td><td class="py-1 text-right text-red-600">- ฿${formatNum(docData.discount)}</td></tr>` : ''}
-                ${docData.hasVat ? `<tr><td class="py-1 text-slate-600">ภาษีมูลค่าเพิ่ม</td><td class="py-1 text-right">฿${formatNum(docData.vatAmount)}</td></tr>` : ''}
-                ${docData.hasWht ? `<tr><td class="py-1 text-slate-600">หัก ณ ที่จ่าย</td><td class="py-1 text-right text-red-600">- ฿${formatNum(docData.whtAmount)}</td></tr>` : ''}
-                <tr class="border-t-2 border-slate-800 font-bold text-base"><td class="py-2">ยอดเงินสุทธิ</td><td class="py-2 text-right">฿${formatNum(docData.grandTotal)}</td></tr>
-            `;
-            el('print-sign-date').textContent = formatDate(docData.date);
-        }
-
-        window.app.closePrint = function() { window.appState.printDocData = null; el('print-modal').classList.add('hidden'); el('main-layout').classList.remove('hidden'); };
-        window.app.triggerPrint = () => window.print();
-
-        // --- Modals (Customer / Product / Employee) ---
-        window.app.openCustomerModal = () => { el('cust-name').value=''; el('cust-addr').value=''; el('cust-tax').value=''; el('cust-phone').value=''; el('cust-email').value=''; el('modal-customer').classList.remove('hidden'); };
-        window.app.closeCustomerModal = () => el('modal-customer').classList.add('hidden');
-        window.app.saveCustomer = async (e) => {
-            e.preventDefault(); const cid = 'C' + Date.now().toString().slice(-6);
-            const data = { name: el('cust-name').value, address: el('cust-addr').value, taxId: el('cust-tax').value, phone: el('cust-phone').value, email: el('cust-email').value };
-            try {
-                await setDoc(doc(db, publicPath, 'customers', cid), data);
-                if (window.appState.isFormOpen) setTimeout(() => { const docCust = el('doc-customer'); if (docCust) docCust.value = cid; }, 500); 
-                window.app.closeCustomerModal(); Swal.fire({ title: 'สำเร็จ', icon: 'success', timer: 1000, showConfirmButton: false });
-            } catch (err) { Swal.fire('Error', 'ไม่สามารถบันทึกได้', 'error'); }
-        };
-
-        window.app.openProductModal = () => { el('prod-code').value=''; el('prod-name').value=''; el('prod-price').value=''; el('modal-product').classList.remove('hidden'); };
-        window.app.closeProductModal = () => el('modal-product').classList.add('hidden');
-        window.app.saveProduct = async (e) => {
-            e.preventDefault(); const pid = 'P' + Date.now().toString().slice(-6);
-            const data = { code: el('prod-code').value, name: el('prod-name').value, price: Number(el('prod-price').value) };
-            try {
-                await setDoc(doc(db, publicPath, 'products', pid), data);
-                window.app.closeProductModal(); Swal.fire({ title: 'สำเร็จ', icon: 'success', timer: 1000, showConfirmButton: false });
-            } catch (err) { Swal.fire('Error', 'ไม่สามารถบันทึกได้', 'error'); }
-        };
-
-        window.app.saveSettings = async () => {
-            const data = { name: el('set-name').value, address: el('set-address').value, taxId: el('set-taxId').value, phone: el('set-phone').value, email: el('set-email').value, logo: window.appState.company.logo || '' };
-            try {
-                await setDoc(doc(db, publicPath, 'settings', 'profile'), data);
-                Swal.fire({ title: 'สำเร็จ', text: 'บันทึกการตั้งค่าเรียบร้อยแล้ว', icon: 'success', timer: 1500, showConfirmButton: false });
-            } catch (err) { Swal.fire('Error', 'ไม่สามารถบันทึกได้', 'error'); }
-        };
-
-        window.app.handleLogoUpload = (e) => {
-            const file = e.target.files[0]; if (!file) return; const reader = new FileReader();
-            reader.onload = (ev) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas'); const maxW = 400; let scale = maxW / img.width; if(scale > 1) scale = 1; 
-                    canvas.width = img.width * scale; canvas.height = img.height * scale; canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height); 
-                    window.appState.company.logo = canvas.toDataURL('image/png', 0.8); renderSettings();
-                }; img.src = ev.target.result;
-            }; reader.readAsDataURL(file);
-        };
-        window.app.clearLogo = () => { window.appState.company.logo = ''; renderSettings(); };
-
-        window.app.openEmployeeModal = () => { el('emp-name').value = ''; el('emp-email').value = ''; el('emp-pass').value = ''; el('emp-role').value = 'employee'; el('modal-employee').classList.remove('hidden'); };
-        window.app.closeEmployeeModal = () => el('modal-employee').classList.add('hidden');
-        window.app.saveEmployee = async (e) => {
-            e.preventDefault(); const name = el('emp-name').value; const email = el('emp-email').value; const pass = el('emp-pass').value; const role = el('emp-role').value;
-            try {
-                Swal.fire({ title: 'กำลังสร้างบัญชี...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-                const newId = 'E' + Date.now().toString().slice(-6);
-                await setDoc(doc(db, publicPath, 'employees', newId), { id: newId, name: name, email: email, password: pass, role: role, createdAt: new Date().toISOString() });
-                Swal.fire('สำเร็จ', 'เพิ่มพนักงานเรียบร้อย', 'success'); window.app.closeEmployeeModal();
-            } catch(err) { Swal.fire('ข้อผิดพลาด', 'ไม่สามารถสร้างพนักงานได้', 'error'); }
-        };
-        window.app.deleteEmployee = (empId) => {
-            Swal.fire({ title: 'ยืนยันการลบ?', text: "การลบโปรไฟล์จะทำให้ผู้ใช้นี้เข้าสู่ระบบไม่ได้อีกต่อไป", icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#94a3b8', confirmButtonText: 'ลบทันที', cancelButtonText: 'ยกเลิก' })
-            .then(async (result) => { if (result.isConfirmed) { try { await deleteDoc(doc(db, publicPath, 'employees', empId)); Swal.fire('สำเร็จ', 'ลบพนักงานเรียบร้อย', 'success'); } catch (e) { Swal.fire('ข้อผิดพลาด', 'ไม่สามารถลบได้', 'error'); } } });
-        };
-
-        // --- Navigation & General ---
-        window.app.switchView = function(viewId) {
-            document.querySelectorAll('.view-section').forEach(e => e.classList.add('hidden'));
-            const viewEl = el(`view-${viewId}`);
-            if (viewEl) viewEl.classList.remove('hidden');
-            
-            window.appState.currentView = viewId;
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                if(btn.dataset.view === viewId) { btn.className = "nav-btn w-full flex items-center py-3 px-4 rounded-xl transition-all duration-200 bg-white/25 text-white shadow-md font-bold backdrop-blur-sm border border-white/20"; } 
-                else { btn.className = "nav-btn w-full flex items-center py-3 px-4 rounded-xl transition-all duration-200 hover:bg-white/15 hover:text-white text-white/80 font-medium"; if(btn.dataset.view === 'employees') { btn.className += " border border-transparent hover:border-emerald-500/30 text-emerald-400"; } }
-            });
-            const titles = { 'dashboard': 'ภาพรวมระบบ', 'documents': 'จัดการเอกสารขาย', 'old_documents': 'เอกสารเก่า (Archive)', 'customers': 'ฐานข้อมูลลูกค้า', 'products': 'จัดการสินค้าและบริการ', 'settings': 'ตั้งค่าองค์กร', 'employees': 'จัดการพนักงาน' };
-            el('header-title').textContent = titles[viewId] || 'ระบบเอกสาร';
-            if (window.innerWidth < 768) { el('sidebar').classList.add('-translate-x-full'); el('sidebar-overlay').classList.add('hidden'); }
-            if(viewId === 'dashboard') renderDashboard(); if(viewId === 'documents') renderDocuments(); if(viewId === 'old_documents') window.app.renderOldDocuments();
-        };
-
-        window.app.toggleDesktopSidebar = () => {
-            const sb = el('sidebar'); const icon = el('sidebar-toggle-icon'); sb.classList.toggle('sidebar-collapsed');
-            if (sb.classList.contains('sidebar-collapsed')) { sb.classList.remove('md:w-64'); sb.classList.add('md:w-20'); icon.className = 'fas fa-chevron-right'; } 
-            else { sb.classList.remove('md:w-20'); sb.classList.add('md:w-64'); icon.className = 'fas fa-chevron-left'; }
-        };
-
-        window.app.toggleMobileSidebar = () => { el('sidebar').classList.toggle('-translate-x-full'); el('sidebar-overlay').classList.toggle('hidden'); };
-        window.addEventListener('resize', () => {
-            if(window.innerWidth >= 768) { el('sidebar').classList.remove('-translate-x-full'); el('sidebar-overlay').classList.add('hidden'); } 
-            else { el('sidebar').classList.add('-translate-x-full'); el('sidebar-overlay').classList.add('hidden'); }
-        });
-
-        window.app.setFilter = (type) => { window.appState.docFilter = type; renderDocuments(); };
-        window.app.updateDashboard = () => { window.appState.selectedMonth = el('dash-month').value; renderDashboard(); };
-        window.app.exportCSV = () => {
-            const sales = window.appState.documents.filter(d => d.type === 'RE' && d.date.startsWith(window.appState.selectedMonth));
-            if (sales.length === 0) return Swal.fire('แจ้งเตือน', 'ไม่มีข้อมูลสำหรับ Export ในเดือนนี้', 'info');
-            let csvContent = "data:text/csv;charset=utf-8,\uFEFFวันที่,เลขที่เอกสาร,ลูกค้า,ยอดรวมสุทธิ\n";
-            sales.forEach(d => { const cName = getCustomer(d.customerId).name || ''; csvContent += `${formatDate(d.date)},${d.id},"${cName.replace(/"/g, '""')}",${d.grandTotal}\n`; });
-            const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `sales_report_${window.appState.selectedMonth}.csv`); document.body.appendChild(link); link.click(); link.remove();
-        };
-
-        // Bootstrap App
-        initCustomAuth();
-    </script>
-</body>
-</html>
+        <div className="mt-4 border-t pt-3">
+          <div className="flex justify-between gap-4">
+            <div className="w-[55%]">
+              <div className="border p-2 rounded min-h-[60px] text-xs text-slate-700">
+                <span className="font-bold text-slate-500 border-b pb-1 block mb-1">หมายเหตุ:</span>
+                <span className="whitespace-pre-wrap">{data.notes || '-'}</span>
+              </div>
+              {data.type === 'RE' && <div className="text-sm bg-green-50 text-green-800 p-1.5 border border-green-200 rounded flex items-center justify-center font-bold mt-2"><CheckCircle size={16} className="mr-2"/>ชำระเงินเรียบร้อยแล้ว</div>}
+            </div>
+            <div className="w-[45%]">
+              <table className="w-full text-sm">
+                <tbody>
+                  <tr><td className="py-1">รวมเป็นเงิน</td><td className="py-1 text-right">฿{formatNum(data.subtotal)}</td></tr>
+                  {data.discount > 0 && <tr><td className="py-1">หักส่วนลด</td><td className="py-1 text-right text-red-600">- ฿{formatNum(data.discount)}</td></tr>}
+                  {data.hasVat && <tr><td className="py-1">ภาษีมูลค่าเพิ่ม 7%</td><td className="py-1 text-right">฿{formatNum(data.vatAmount)}</td></tr>}
+                  {data.hasWht && <tr><td className="py-1">หัก ณ ที่จ่าย {data.whtRate}%</td><td className="py-1 text-right text-red-600">- ฿{formatNum(data.whtAmount)}</td></tr>}
+                  <tr className="border-t-2 border-slate-800 font-bold text-base"><td className="py-2">ยอดเงินสุทธิ</td><td className="py-2 text-right">฿{formatNum(data.grandTotal)}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-6 text-center text-[12px] border-t-2 border-slate-400 pt-6 mt-6 relative">
+            <div>
+              <div className="border-b border-slate-400 w-40 mx-auto mb-1 h-12"></div>
+              <p className="font-medium">ผู้รับเอกสาร</p>
+              <p className="text-[10px] text-slate-500 mt-1">วันที่ _______/_______/_______</p>
+            </div>
+            <div className="relative">
+              <div className="border-b border-slate-400 w-40 mx-auto mb-1 h-12 flex items-end justify-center">
+                 <span className="text-emerald-800 font-serif italic text-lg border-2 border-emerald-500 rounded-full px-3 py-0.5 rotate-[15deg] opacity-70 absolute top-[-15px] bg-white">Approved</span>
+              </div>
+              <p className="font-medium">ผู้อนุมัติ / ผู้รับมอบอำนาจ</p>
+              <p className="text-[10px] text-slate-500 mt-1">วันที่ {formatDate(data.date)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
