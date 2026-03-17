@@ -193,7 +193,7 @@
                                 <i class="fas fa-check-circle mr-2 text-lg"></i> ชำระเงินเรียบร้อยแล้ว
                             </div>
                         </div>
-                        <div class="w-[40%]">
+                        <div class="w-[45%]">
                             <table class="w-full text-sm">
                                 <tbody id="print-totals-tbody">
                                     <!-- Totals will be injected here -->
@@ -738,8 +738,8 @@
             docTotals: { subtotal: 0, vatAmount: 0, whtAmount: 0, grandTotal: 0 },
             printDocData: null,
             isSetupMode: false, 
-            currentUserRole: null, // ถูกรีเซ็ตตอนเริ่มเพื่อให้เช็คสิทธิ์ได้แม่นยำ
-            profileLoaded: false,  // ตัวเช็คการดึงข้อมูลเพื่อแก้บั๊กโดนเตะออก
+            currentUserRole: null, 
+            profileLoaded: false,  
             listeners: []
         };
 
@@ -799,10 +799,16 @@
                     window.appState.isSetupMode = false;
                     
                     if (err.code === 'auth/configuration-not-found') {
+                        // แจ้งเตือนเรื่องการเปิดใช้งาน Anonymous Auth ให้ชัดเจน
                         Swal.fire({
-                            title: 'ตรวจสอบการตั้งค่า Firebase',
-                            html: 'ไม่สามารถสร้างบัญชีผู้ดูแลระบบอัตโนมัติได้ เนื่องจากยังไม่ได้เปิดใช้งาน <b>Anonymous Auth</b><br><br>กรุณากดปุ่ม <b>"สำหรับการใช้งานครั้งแรก (สร้าง Admin)"</b> ด้านล่างเพื่อดำเนินการต่อ',
-                            icon: 'warning'
+                            title: 'ยังเข้าใช้งานไม่ได้',
+                            html: `คุณต้องเข้าไปที่ Firebase Console ก่อน<br><br>
+                                   1. เมนู <b>Authentication > Sign-in method</b><br>
+                                   2. กดเปิดใช้งาน <b>Anonymous</b><br>
+                                   3. กดเปิดใช้งาน <b>Email/Password</b><br><br>
+                                   หากคุณตั้งค่าเสร็จแล้ว หรือมั่นใจว่าเคยสมัคร Admin ไว้แล้ว สามารถกดปุ่มด้านล่างเพื่อล็อกอินได้เลย`,
+                            icon: 'warning',
+                            confirmButtonText: 'รับทราบ'
                         });
                         el('auth-toggle-btn').classList.remove('hidden');
                     } else {
@@ -817,7 +823,7 @@
             if(window.appState.isSetupMode) {
                 el('auth-title').textContent = 'สร้างบัญชีผู้ดูแลระบบ (Admin)';
                 el('auth-submit-btn').textContent = 'สร้างบัญชี Admin';
-                el('auth-toggle-btn').innerHTML = '<i class="fas fa-sign-in-alt mr-1"></i> กลับไปหน้าเข้าสู่ระบบ';
+                el('auth-toggle-btn').innerHTML = '<i class="fas fa-sign-in-alt mr-1"></i> มีบัญชีแล้ว? เข้าสู่ระบบ';
             } else {
                 el('auth-title').textContent = 'เข้าสู่ระบบ';
                 el('auth-submit-btn').textContent = 'เข้าสู่ระบบ';
@@ -834,17 +840,32 @@
                 Swal.fire({ title: 'กำลังประมวลผล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                 
                 if (window.appState.isSetupMode) {
-                    const cred = await createUserWithEmailAndPassword(auth, email, pass);
-                    await setDoc(doc(db, publicPath, 'employees', cred.user.uid), {
-                        name: 'System Admin',
-                        email: email,
-                        role: 'admin',
-                        createdAt: new Date().toISOString()
-                    });
+                    try {
+                        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+                        await setDoc(doc(db, publicPath, 'employees', cred.user.uid), {
+                            name: 'System Admin',
+                            email: email,
+                            role: 'admin',
+                            createdAt: new Date().toISOString()
+                        });
+                        Swal.close();
+                    } catch (createErr) {
+                        // กู้คืนอัตโนมัติหากอีเมลซ้ำ (Auth ติดแต่ Firestore ไม่ติด)
+                        if (createErr.code === 'auth/email-already-in-use') {
+                            try {
+                                await signInWithEmailAndPassword(auth, email, pass);
+                                Swal.close();
+                            } catch (loginErr) {
+                                Swal.fire('ข้อผิดพลาด', 'อีเมลนี้มีในระบบแล้ว แต่รหัสผ่านไม่ถูกต้อง', 'error');
+                            }
+                        } else {
+                            throw createErr;
+                        }
+                    }
                 } else {
                     await signInWithEmailAndPassword(auth, email, pass);
+                    Swal.close();
                 }
-                Swal.close();
             } catch (err) {
                 console.error(err);
                 let msg = 'เกิดข้อผิดพลาด กรุณาลองใหม่';
@@ -878,12 +899,9 @@
 
             const uid = auth.currentUser.uid;
 
-            // ดักจับข้อมูลผู้ใช้แบบ Realtime และป้องกันบั๊กหน้ากระดาษโหลด
             const unsubProfile = onSnapshot(doc(db, publicPath, 'employees', uid), async (snap) => {
                 if(!snap.exists()) {
-                    // หากยังไม่เคยโหลดข้อมูลโปรไฟล์สำเร็จเลย (อาจเกิดจากโหลดเร็วกว่าตอนเซฟลงฐานข้อมูลในครั้งแรก)
                     if (!window.appState.profileLoaded) {
-                        // ลองตรวจสอบว่าฐานข้อมูลว่างเปล่าไหม เพื่อกู้คืน Admin
                         const empSnap = await getDocs(collection(db, publicPath, 'employees'));
                         if (empSnap.empty) {
                             await setDoc(doc(db, publicPath, 'employees', uid), {
@@ -893,17 +911,15 @@
                                 createdAt: new Date().toISOString()
                             });
                         } else {
-                            // รอ 2 วินาทีเผื่อระบบกำลังบันทึกข้อมูล ถ้ายังไม่มีค่อยเด้งออก
                             setTimeout(async () => {
                                 if (!window.appState.profileLoaded && auth.currentUser) {
                                     Swal.fire('ไม่มีสิทธิ์เข้าถึง', 'บัญชีนี้ไม่ได้เป็นพนักงานในระบบ', 'error').then(() => signOut(auth));
                                 }
-                            }, 2000);
+                            }, 1500);
                         }
                         return;
                     }
 
-                    // ถ้าเคยโหลดโปรไฟล์ได้แล้ว แต่จู่ๆ หายไป แสดงว่าถูก Admin ลบ
                     Swal.fire('การเข้าถึงถูกระงับ', 'บัญชีของคุณถูกลบหรือระงับการใช้งาน', 'error').then(() => {
                         signOut(auth);
                     });
@@ -1371,13 +1387,13 @@
 
             el('print-items-tbody').innerHTML = docData.items.map((i, idx) => `
                 <tr class="border-b border-slate-200">
-                    <td class="py-2 px-2 text-center">${idx + 1}</td>
-                    <td class="py-2 px-2 font-medium">${i.name}</td>
-                    <td class="py-2 px-2 text-right">${i.qty}</td>
-                    <td class="py-2 px-2 text-right">${formatNum(i.price)}</td>
-                    <td class="py-2 px-2 text-right font-medium">${formatNum(i.qty * i.price)}</td>
+                    <td class="py-1.5 px-2 text-center border-r border-white">${idx + 1}</td>
+                    <td class="py-1.5 px-2 border-r border-white font-medium">${i.name}</td>
+                    <td class="py-1.5 px-2 text-right border-r border-white">${i.qty}</td>
+                    <td class="py-1.5 px-2 text-right border-r border-white">${formatNum(i.price)}</td>
+                    <td class="py-1.5 px-2 text-right font-medium">${formatNum(i.qty * i.price)}</td>
                 </tr>
-            `).join('') + Array(Math.max(0, 5 - docData.items.length)).fill('<tr><td colspan="5" class="py-3 border-b border-slate-50"></td></tr>').join('');
+            `).join('');
 
             el('print-doc-notes').textContent = docData.notes || '-';
             if (docData.type === 'RE') el('print-stamp-paid').classList.remove('hidden');
