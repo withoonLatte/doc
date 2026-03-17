@@ -124,7 +124,7 @@
             </aside>
 
             <!-- Main Workspace -->
-            <main class="flex-1 flex flex-col h-full overflow-hidden transition-all duration-300">
+            <main v-show="!printDoc" class="flex-1 flex flex-col h-full overflow-hidden transition-all duration-300">
                 <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 shrink-0 z-10 shadow-sm">
                     <div class="flex items-center">
                         <button @click="isMobileMenuOpen = true" class="p-2 mr-3 text-slate-500 hover:bg-slate-100 rounded-md md:hidden transition-colors">
@@ -469,7 +469,7 @@
                                 <div><label class="block text-sm font-semibold mb-1 text-slate-700">เลขผู้เสียภาษี</label><input type="text" v-model="company.taxId" class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition"></div>
                                 <div><label class="block text-sm font-semibold mb-1 text-slate-700">เบอร์โทร</label><input type="text" v-model="company.phone" class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition"></div>
                             </div>
-                            <div><label class="block text-sm font-semibold mb-1 text-slate-700">อีเมล</label><input type="text" v-model="company.email" class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition"></div>
+                            <div><label class="block text-sm font-semibold mb-1 text-slate-700">อีเมล</label><input type="email" v-model="company.email" class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition"></div>
                         </div>
                     </div>
 
