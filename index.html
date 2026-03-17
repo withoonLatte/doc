@@ -126,106 +126,61 @@
         }
 
         // ==========================================
-        // 2. AUTH SCREEN
+        // 2. AUTH SCREEN (Demo Login)
         // ==========================================
         function AuthScreen({ onLogin }) {
-            const [isSetup, setIsSetup] = useState(false);
-            const [loading, setLoading] = useState(true);
-            const [name, setName] = useState('');
-            const [email, setEmail] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [username, setUsername] = useState('');
             const [password, setPassword] = useState('');
             const [error, setError] = useState('');
 
-            useEffect(() => {
-                const checkDb = async () => {
-                    try {
-                        const snap = await getDocs(collection(db, publicPath, 'employees'));
-                        setIsSetup(snap.empty);
-                    } catch (err) {
-                        setError('ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาตรวจสอบ Rules ใน Firestore');
-                    }
-                    setLoading(false);
-                };
-                checkDb();
-            }, []);
-
-            const handleSubmit = async (e) => {
+            const handleSubmit = (e) => {
                 e.preventDefault();
                 setError('');
                 setLoading(true);
                 
-                try {
-                    const snap = await getDocs(collection(db, publicPath, 'employees'));
-                    
-                    if (isSetup) {
-                        if (snap.docs.some(d => d.data().email === email)) {
-                            setError('อีเมลนี้มีอยู่ในระบบแล้ว');
-                            setLoading(false); return;
-                        }
-                        const newId = 'E' + Date.now().toString().slice(-6);
-                        const userData = { id: newId, name: name || 'Admin', email, password, role: 'admin', createdAt: new Date().toISOString() };
-                        await setDoc(doc(db, publicPath, 'employees', newId), userData);
-                        onLogin(userData);
+                // ระบบล็อคอินแบบ Demo
+                setTimeout(() => {
+                    if (username === 'admin' && password === '1234') {
+                        onLogin({ id: 'demo_admin', name: 'Admin (Demo)', email: 'admin@demo.local', role: 'admin' });
                     } else {
-                        const userDoc = snap.docs.find(d => d.data().email === email && d.data().password === password);
-                        if (userDoc) {
-                            onLogin({ id: userDoc.id, ...userDoc.data() });
-                        } else {
-                            setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
-                        }
+                        setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (กรุณาใช้ admin / 1234)');
+                        setLoading(false);
                     }
-                } catch (err) {
-                    setError('เกิดข้อผิดพลาด กรุณาลองใหม่');
-                }
-                setLoading(false);
+                }, 500); // หน่วงเวลาเล็กน้อยให้ดูเหมือนกำลังโหลด
             };
-
-            if (loading) {
-                return <div className="flex h-screen items-center justify-center bg-slate-100"><span className="text-emerald-600 font-bold"><i className="fas fa-circle-notch fa-spin mr-2"></i>กำลังตรวจสอบระบบ...</span></div>;
-            }
 
             return (
                 <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200">
                         <div className="bg-emerald-600 p-6 text-center text-white">
                             <i className="fas fa-file-invoice-dollar text-4xl mb-2"></i>
-                            <h2 className="text-2xl font-bold">{isSetup ? 'สร้างบัญชีผู้ดูแลระบบ (Admin)' : 'เข้าสู่ระบบ'}</h2>
+                            <h2 className="text-2xl font-bold">เข้าสู่ระบบ</h2>
                             <p className="text-emerald-100 text-sm mt-1">ระบบจัดการเอกสารขาย</p>
                         </div>
                         <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5">
                             {error && <div className="bg-red-50 text-red-600 p-3 rounded text-sm text-center border border-red-200"><i className="fas fa-exclamation-triangle mr-2"></i>{error}</div>}
                             
-                            {isSetup && (
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">ชื่อผู้ใช้</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i className="fas fa-user text-slate-400"></i></div>
-                                        <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full pl-10 p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none" required placeholder="ชื่อ-นามสกุล" />
-                                    </div>
-                                </div>
-                            )}
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">อีเมล</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">ชื่อผู้ใช้</label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i className="fas fa-envelope text-slate-400"></i></div>
-                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full pl-10 p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none" required placeholder="name@example.com" />
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i className="fas fa-user text-slate-400"></i></div>
+                                    <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full pl-10 p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none" required placeholder="admin" />
                                 </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">รหัสผ่าน</label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i className="fas fa-lock text-slate-400"></i></div>
-                                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full pl-10 p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none" required placeholder="••••••••" />
+                                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full pl-10 p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none" required placeholder="1234" />
                                 </div>
                             </div>
                             <button type="submit" disabled={loading} className="w-full bg-emerald-600 text-white font-bold rounded-lg px-4 py-3 hover:bg-emerald-700 transition shadow-md disabled:opacity-50 flex items-center justify-center">
-                                {loading ? <i className="fas fa-circle-notch fa-spin"></i> : (isSetup ? 'สร้างบัญชี Admin' : 'เข้าสู่ระบบ')}
+                                {loading ? <i className="fas fa-circle-notch fa-spin"></i> : 'เข้าสู่ระบบ'}
                             </button>
                             
                             <div className="text-center mt-4 pt-4 border-t border-slate-100">
-                                <button type="button" onClick={() => setIsSetup(!isSetup)} className="text-xs text-slate-400 hover:text-emerald-600 transition-colors font-medium">
-                                    {isSetup ? <><i className="fas fa-sign-in-alt mr-1"></i> มีบัญชีแล้ว? เข้าสู่ระบบ</> : <><i className="fas fa-cog mr-1"></i> สำหรับการใช้งานครั้งแรก (สร้าง Admin)</>}
-                                </button>
+                                <p className="text-xs text-slate-500 font-medium">Demo Login: ชื่อผู้ใช้ <b>admin</b> | รหัสผ่าน <b>1234</b></p>
                             </div>
                         </form>
                     </div>
@@ -248,8 +203,7 @@
             const [employees, setEmployees] = useState([]);
             const [dataLoaded, setDataLoaded] = useState(false);
 
-            const currentUserRecord = employees.find(e => e.id === user.id);
-            const userRole = currentUserRecord ? currentUserRecord.role : user.role;
+            const userRole = user.role; // กำหนดตามที่เก็บไว้ใน localStorage (กรณีนี้คือ admin)
 
             const [printDoc, setPrintDoc] = useState(null);
 
@@ -265,16 +219,12 @@
                 const unsubProd = onSnapshot(collection(db, publicPath, 'products'), snap => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
                 const unsubDocs = onSnapshot(collection(db, publicPath, 'documents'), snap => setDocuments(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => b.id.localeCompare(a.id))));
                 const unsubEmp = onSnapshot(collection(db, publicPath, 'employees'), snap => {
-                    const emps = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    setEmployees(emps);
-                    if (dataLoaded && !emps.find(e => e.id === user.id)) {
-                        Swal.fire('ข้อผิดพลาด', 'บัญชีของคุณถูกระงับ', 'error').then(onLogout);
-                    }
+                    setEmployees(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
 
                 setDataLoaded(true);
                 return () => { unsubSettings(); unsubCust(); unsubProd(); unsubDocs(); unsubEmp(); };
-            }, [user.id]);
+            }, []);
 
             const confirmLogout = () => {
                 Swal.fire({
@@ -368,7 +318,7 @@
                             <div className="flex items-center space-x-4">
                                 <div className="flex flex-col text-right hidden sm:flex">
                                     <span className="text-sm font-bold text-slate-700 truncate max-w-[150px]">{company.name || 'ตั้งค่าบริษัท'}</span>
-                                    <span className="text-xs text-emerald-600 font-medium">{user.name} ({userRole})</span>
+                                    <span className="text-xs text-emerald-600 font-medium">{user.name}</span>
                                 </div>
                                 <button onClick={confirmLogout} title="ออกจากระบบ" className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center space-x-2 border border-transparent hover:border-red-200">
                                     <i className="fas fa-sign-out-alt"></i> <span className="text-sm font-bold hidden sm:block">ออก</span>
@@ -597,7 +547,7 @@
                     }
                     
                     Swal.fire({ title: 'สำเร็จ', icon: 'success', timer: 1000, showConfirmButton: false });
-                    onClose(); // ทริกเกอร์ให้ React ซ่อน Component นี้
+                    onClose(); 
                 } catch (err) {
                     Swal.fire('ข้อผิดพลาด', 'บันทึกไม่สำเร็จ', 'error');
                 }
@@ -782,9 +732,8 @@
                         <button onClick={() => setShowModal(true)} className="px-3 sm:px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-bold border border-emerald-200 hover:bg-emerald-100 transition"><i className="fas fa-plus mr-1 sm:mr-2"></i> เพิ่มรายการ</button>
                     </div>
                     <div className="overflow-x-auto w-full">
-                        <table className="w-full text-left text-sm min-w-[500px]">
-                            <thead className="bg-white border-b border-slate-200"><tr><th className="p-4 text-slate-500 font-semibold whitespace-nowrap">รหัส</th><th className="p-4 text-slate-500 font-semibold whitespace-nowrap">ชื่อรายการ</th><th className="p-4 text-slate-500 font-semibold text-right whitespace-nowrap">ราคา</th></tr></thead>
-                            <tbody>{products.map(p => <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50 transition"><td className="p-4 text-emerald-600 font-medium whitespace-nowrap">{p.code}</td><td className="p-4 font-semibold whitespace-nowrap">{p.name}</td><td className="p-4 font-bold text-right whitespace-nowrap">฿{formatNum(p.price)}</td></tr>)}</tbody>
+                        <table className="w-full text-left text-sm min-w-[500px]"><thead className="bg-white border-b border-slate-200"><tr><th className="p-4 text-slate-500 font-semibold whitespace-nowrap">รหัส</th><th className="p-4 text-slate-500 font-semibold whitespace-nowrap">ชื่อรายการ</th><th className="p-4 text-slate-500 font-semibold text-right whitespace-nowrap">ราคา</th></tr></thead>
+                        <tbody>{products.map(p => <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50 transition"><td className="p-4 text-emerald-600 font-medium whitespace-nowrap">{p.code}</td><td className="p-4 font-semibold whitespace-nowrap">{p.name}</td><td className="p-4 font-bold text-right whitespace-nowrap">฿{formatNum(p.price)}</td></tr>)}</tbody>
                         </table>
                     </div>
                     {showModal && <ProductModal onClose={() => setShowModal(false)} />}
@@ -942,8 +891,8 @@
                         <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0 sticky top-0 z-10"><h3 className="font-bold text-lg text-emerald-800">เพิ่มพนักงาน</h3><button onClick={onClose} className="text-slate-400 hover:text-red-500 transition p-1"><i className="fas fa-times text-xl"></i></button></div>
                         <form onSubmit={saveEmp} className="p-5 sm:p-6 space-y-4">
                             <div><label className="block text-sm font-medium mb-1 text-slate-700">ชื่อ-นามสกุล</label><input type="text" value={form.name} onChange={e=>setForm({...form, name: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400" required /></div>
-                            <div><label className="block text-sm font-medium mb-1 text-slate-700">อีเมล / Username</label><input type="email" value={form.email} onChange={e=>setForm({...form, email: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400" required /></div>
-                            <div><label className="block text-sm font-medium mb-1 text-slate-700">รหัสผ่าน (ขั้นต่ำ 4 ตัว)</label><input type="password" minLength="4" value={form.password} onChange={e=>setForm({...form, password: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400" required /></div>
+                            <div><label className="block text-sm font-medium mb-1 text-slate-700">อีเมล / Username</label><input type="text" value={form.email} onChange={e=>setForm({...form, email: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400" required /></div>
+                            <div><label className="block text-sm font-medium mb-1 text-slate-700">รหัสผ่าน</label><input type="password" minLength="4" value={form.password} onChange={e=>setForm({...form, password: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400" required /></div>
                             <div><label className="block text-sm font-medium mb-1 text-slate-700">ระดับสิทธิ์</label><select value={form.role} onChange={e=>setForm({...form, role: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400"><option value="employee">พนักงานทั่วไป</option><option value="admin">ผู้ดูแลระบบ (Admin)</option></select></div>
                             <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100"><button type="button" onClick={onClose} className="px-5 py-2.5 border border-slate-300 rounded-lg text-slate-600 font-medium hover:bg-slate-50">ยกเลิก</button><button type="submit" className="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-bold shadow-md hover:bg-emerald-700">บันทึก</button></div>
                         </form>
