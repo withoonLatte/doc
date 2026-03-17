@@ -13,8 +13,6 @@
     
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- html2pdf -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap');
@@ -37,12 +35,12 @@
                 left: 0 !important; 
                 top: 0 !important; 
                 width: 210mm !important; 
-                height: 297mm !important;
+                height: 297mm !important; /* บังคับสูง A4 */
                 margin: 0 !important; 
-                padding: 15mm !important; 
+                padding: 15mm !important; /* เว้นขอบด้านใน */
                 box-shadow: none !important;
                 page-break-after: avoid !important;
-                transform: none !important;
+                transform: scale(1) !important;
             }
             @page { size: A4 portrait; margin: 0mm; }
             .no-print { display: none !important; }
@@ -99,7 +97,6 @@
                     เข้าสู่ระบบ
                 </button>
 
-                <!-- ปุ่มตั้งค่าระบบครั้งแรก (ช่วยให้สร้าง Admin ได้เสมอ) -->
                 <div class="text-center mt-4 pt-4 border-t border-slate-100">
                     <button type="button" onclick="window.app.toggleSetupMode()" id="auth-toggle-btn" class="text-xs text-slate-400 hover:text-emerald-600 font-medium transition-colors">
                         <i class="fas fa-cog mr-1"></i> สำหรับการใช้งานครั้งแรก (สร้าง Admin)
@@ -113,108 +110,112 @@
     <div id="print-modal" class="hidden fixed inset-0 bg-slate-800/95 z-50 flex-col overflow-hidden py-4 px-2 sm:py-8 sm:px-4 flex">
         
         <!-- Controls -->
-        <div class="no-print bg-white p-3 sm:p-4 rounded-xl shadow-lg flex flex-wrap justify-center gap-2 sm:gap-3 mb-4 shrink-0 w-full max-w-lg mx-auto border border-slate-200">
-            <button onclick="window.app.triggerPrint()" class="px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center flex-1 justify-center transition shadow-sm font-semibold text-sm sm:text-base"><i class="fas fa-print mr-2"></i> พิมพ์ / PDF</button>
+        <div class="no-print bg-white p-3 sm:p-4 rounded-xl shadow-lg flex flex-wrap justify-center gap-2 sm:gap-3 mb-4 shrink-0 w-full max-w-sm mx-auto border border-slate-200">
+            <button onclick="window.app.triggerPrint()" class="px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center flex-1 justify-center transition shadow-sm font-semibold text-sm sm:text-base"><i class="fas fa-print mr-2"></i> พิมพ์เอกสาร</button>
             <button onclick="window.app.closePrint()" class="px-4 py-2 sm:py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg flex items-center justify-center transition shadow-sm font-semibold text-sm sm:text-base"><i class="fas fa-times mr-2"></i> ปิด</button>
         </div>
 
         <!-- A4 Paper Container (Scrollable) -->
         <div class="flex-1 overflow-auto w-full flex justify-center pb-12">
-            <!-- ขนาดกระดาษ A4 ตายตัว 100% ป้องกันหน้าพัง -->
-            <div id="print-section" class="bg-white text-slate-800 box-border flex flex-col shadow-2xl shrink-0 print:shadow-none" style="width: 210mm; min-height: 297mm; padding: 15mm; margin: 0 auto;">
+            <!-- ขนาดกระดาษ A4 ตายตัว 100% -->
+            <div id="print-section" class="bg-white text-slate-800 box-border flex flex-col justify-between shadow-2xl shrink-0 print:shadow-none print:m-0 overflow-hidden origin-top scale-[0.45] md:scale-100" style="width: 210mm; height: 297mm; padding: 15mm; margin: 0 auto;">
                 
-                <!-- ส่วนหัวเอกสาร: แก้ไขช่องว่างโลโก้ให้พอดี -->
-                <div class="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-5 shrink-0">
-                    <div class="flex items-start gap-4">
-                        <img id="print-logo" src="" alt="Logo" class="hidden h-16 w-auto object-contain shrink-0" style="max-width: 180px;">
-                        <div id="print-logo-placeholder" class="w-16 h-16 shrink-0 bg-emerald-600 text-white flex items-center justify-center font-bold text-xl rounded shadow">LOGO</div>
+                <!-- ส่วนบนสุด: โลโก้ และ หัวเอกสาร -->
+                <div>
+                    <div class="flex justify-between items-start border-b-2 border-slate-800 pb-3 mb-3 shrink-0">
+                        <div class="flex items-start gap-4">
+                            <img id="print-logo" src="" alt="Logo" class="hidden h-14 w-auto object-contain shrink-0" style="max-width: 160px;">
+                            <div id="print-logo-placeholder" class="w-14 h-14 shrink-0 bg-emerald-600 text-white flex items-center justify-center font-bold text-xl rounded shadow">LOGO</div>
+                            
+                            <div class="max-w-[300px]">
+                                <h1 id="print-company-name" class="text-lg font-bold text-emerald-900 leading-tight mb-1"></h1>
+                                <p id="print-company-address" class="text-[11px] text-slate-600 mb-0.5 whitespace-pre-wrap leading-tight"></p>
+                                <p class="text-[11px] text-slate-600 mb-0.5">เลขประจำตัวผู้เสียภาษี: <span id="print-company-tax"></span></p>
+                                <p class="text-[11px] text-slate-600">โทร: <span id="print-company-phone"></span> | อีเมล: <span id="print-company-email"></span></p>
+                            </div>
+                        </div>
                         
-                        <div class="max-w-[300px]">
-                            <h1 id="print-company-name" class="text-xl font-bold text-emerald-900 leading-tight mb-1"></h1>
-                            <p id="print-company-address" class="text-xs text-slate-600 mb-0.5 whitespace-pre-wrap leading-relaxed"></p>
-                            <p class="text-xs text-slate-600 mb-0.5">เลขประจำตัวผู้เสียภาษี: <span id="print-company-tax"></span></p>
-                            <p class="text-xs text-slate-600">โทร: <span id="print-company-phone"></span> | อีเมล: <span id="print-company-email"></span></p>
+                        <div class="text-right shrink-0 ml-4">
+                            <h2 id="print-doc-title" class="text-xl font-bold text-slate-800 mb-2"></h2>
+                            <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-sm text-left bg-slate-50 p-2 rounded border border-slate-200 min-w-[160px]">
+                                <span class="font-semibold text-slate-600">เลขที่:</span> <span id="print-doc-id" class="font-bold"></span>
+                                <span class="font-semibold text-slate-600">วันที่:</span> <span id="print-doc-date"></span>
+                                <span id="print-ref-label" class="font-semibold text-slate-600 hidden">อ้างอิง:</span> <span id="print-doc-ref" class="hidden"></span>
+                            </div>
                         </div>
                     </div>
-                    
-                    <div class="text-right shrink-0 ml-4">
-                        <h2 id="print-doc-title" class="text-2xl font-bold text-slate-800 mb-2"></h2>
-                        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-left bg-slate-50 p-3 rounded border border-slate-200 min-w-[180px]">
-                            <span class="font-semibold text-slate-600">เลขที่:</span> <span id="print-doc-id" class="font-bold"></span>
-                            <span class="font-semibold text-slate-600">วันที่:</span> <span id="print-doc-date"></span>
-                            <span id="print-ref-label" class="font-semibold text-slate-600 hidden">อ้างอิง:</span> <span id="print-doc-ref" class="hidden"></span>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- ส่วนข้อมูลลูกค้า -->
-                <div class="flex justify-between mb-5 shrink-0">
-                    <div class="w-[60%] border border-slate-300 p-3 rounded min-h-[90px]">
-                        <h3 class="text-xs font-bold text-slate-500 mb-1 border-b border-slate-200 pb-1">ลูกค้า (Customer)</h3>
-                        <p id="print-cust-name" class="font-bold text-sm text-slate-800"></p>
-                        <p id="print-cust-addr" class="text-xs mt-1 text-slate-700"></p>
-                        <p class="text-xs mt-1 text-slate-700">เลขประจำตัวผู้เสียภาษี: <span id="print-cust-tax"></span></p>
-                        <p class="text-xs mt-1 text-slate-700">โทร: <span id="print-cust-phone"></span> | อีเมล: <span id="print-cust-email"></span></p>
-                    </div>
-                    <div class="w-[35%] border border-slate-300 p-3 rounded min-h-[90px] flex flex-col justify-center text-sm">
-                        <div class="flex justify-between mb-1"><span class="text-slate-500">เงื่อนไขชำระ:</span> <span class="font-medium">30 วัน</span></div>
-                        <div class="flex justify-between mb-1"><span class="text-slate-500">วันครบกำหนด:</span> <span id="print-doc-due" class="font-medium"></span></div>
-                    </div>
-                </div>
-
-                <!-- ส่วนตารางรายการ (flex-1 เพื่อให้ดันส่วนท้ายลงไป) -->
-                <div class="flex-1 mb-6">
-                    <table class="w-full text-sm border-collapse">
-                        <thead>
-                            <tr class="bg-slate-100 border-y-2 border-slate-400">
-                                <th class="py-2 px-2 text-center w-12 border-r border-white">ลำดับ</th>
-                                <th class="py-2 px-2 text-left border-r border-white">รายละเอียดสินค้า/บริการ</th>
-                                <th class="py-2 px-2 text-right w-20 border-r border-white">จำนวน</th>
-                                <th class="py-2 px-2 text-right w-24 border-r border-white">ราคา/หน่วย</th>
-                                <th class="py-2 px-2 text-right w-32">จำนวนเงิน</th>
-                            </tr>
-                        </thead>
-                        <tbody id="print-items-tbody">
-                            <!-- Items will be injected here -->
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- ส่วนสรุปยอดและหมายเหตุ -->
-                <div class="flex justify-between shrink-0 border-t border-slate-300 pt-4">
-                    <div class="w-1/2 pr-8">
-                        <div class="border border-slate-300 p-3 rounded h-full min-h-[80px] text-xs text-slate-700">
-                            <span class="font-bold text-slate-500 mb-1 block border-b border-slate-200 pb-1">หมายเหตุ:</span>
-                            <span id="print-doc-notes" class="whitespace-pre-wrap"></span>
+                    <!-- ส่วนข้อมูลลูกค้า -->
+                    <div class="flex justify-between mb-4 shrink-0 gap-4">
+                        <div class="flex-1 border border-slate-300 p-2.5 rounded min-h-[80px]">
+                            <h3 class="text-[11px] font-bold text-slate-500 mb-1 border-b border-slate-200 pb-1">ลูกค้า (Customer)</h3>
+                            <p id="print-cust-name" class="font-bold text-sm text-slate-800"></p>
+                            <p id="print-cust-addr" class="text-xs mt-1 text-slate-700"></p>
+                            <p class="text-[11px] mt-1 text-slate-700">เลขประจำตัวผู้เสียภาษี: <span id="print-cust-tax"></span></p>
+                            <p class="text-[11px] mt-1 text-slate-700">โทร: <span id="print-cust-phone"></span> | อีเมล: <span id="print-cust-email"></span></p>
                         </div>
-                        <div id="print-stamp-paid" class="hidden text-sm bg-green-50 text-green-800 p-2 border border-green-200 rounded flex items-center justify-center font-bold mt-2">
-                            <i class="fas fa-check-circle mr-2 text-lg"></i> ชำระเงินเรียบร้อยแล้ว
+                        <div class="w-[30%] border border-slate-300 p-2.5 rounded min-h-[80px] flex flex-col justify-center text-sm">
+                            <div class="flex justify-between mb-1"><span class="text-slate-500 text-[11px]">เงื่อนไขชำระ:</span> <span class="font-medium text-[11px]">30 วัน</span></div>
+                            <div class="flex justify-between mb-1"><span class="text-slate-500 text-[11px]">วันครบกำหนด:</span> <span id="print-doc-due" class="font-medium text-[11px]"></span></div>
                         </div>
                     </div>
-                    <div class="w-[40%]">
-                        <table class="w-full text-sm">
-                            <tbody id="print-totals-tbody">
-                                <!-- Totals will be injected here -->
+
+                    <!-- ส่วนตารางรายการ -->
+                    <div class="w-full">
+                        <table class="w-full text-sm border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 border-y-2 border-slate-400">
+                                    <th class="py-1.5 px-2 text-center w-12 border-r border-white">ลำดับ</th>
+                                    <th class="py-1.5 px-2 text-left border-r border-white">รายละเอียดสินค้า/บริการ</th>
+                                    <th class="py-1.5 px-2 text-right w-20 border-r border-white">จำนวน</th>
+                                    <th class="py-1.5 px-2 text-right w-24 border-r border-white">ราคา/หน่วย</th>
+                                    <th class="py-1.5 px-2 text-right w-28">จำนวนเงิน</th>
+                                </tr>
+                            </thead>
+                            <tbody id="print-items-tbody">
+                                <!-- Items will be injected here -->
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                <!-- ส่วนลายเซ็น ดันไปด้านล่างสุดเสมอด้วย mt-auto -->
-                <div class="grid grid-cols-2 gap-8 text-center text-sm border-t-2 border-slate-400 pt-8 mt-10 shrink-0 relative">
-                    <div>
-                        <div class="border-b border-slate-400 w-48 mx-auto mb-2 h-16"></div>
-                        <p class="font-medium text-slate-800">ผู้รับเอกสาร</p>
-                        <p class="text-xs text-slate-500 mt-1">วันที่ _______/_______/_______</p>
-                    </div>
-                    <div class="relative">
-                        <div class="border-b border-slate-400 w-48 mx-auto mb-2 h-16 flex items-end justify-center pb-1">
-                            <span class="text-emerald-800 font-serif italic text-xl border-2 border-emerald-500 rounded-full px-4 py-1 rotate-[15deg] opacity-70 absolute top-[-10px] bg-white">Approved</span>
+                <!-- ส่วนล่างสุด: สรุปยอดและลายเซ็น (ใช้วิธีจัดให้อยู่ด้านล่างเสมอ) -->
+                <div>
+                    <div class="flex justify-between shrink-0 border-t border-slate-300 pt-3 mt-4 gap-4">
+                        <div class="w-[55%]">
+                            <div class="border border-slate-300 p-2 rounded min-h-[60px] text-xs text-slate-700 mb-2">
+                                <span class="font-bold text-slate-500 mb-1 block border-b border-slate-200 pb-1">หมายเหตุ:</span>
+                                <span id="print-doc-notes" class="whitespace-pre-wrap leading-tight block mt-1"></span>
+                            </div>
+                            <div id="print-stamp-paid" class="hidden text-sm bg-green-50 text-green-800 p-1.5 border border-green-200 rounded flex items-center justify-center font-bold">
+                                <i class="fas fa-check-circle mr-2"></i> ชำระเงินเรียบร้อยแล้ว
+                            </div>
                         </div>
-                        <p class="font-medium text-slate-800">ผู้อนุมัติ / ผู้รับมอบอำนาจ</p>
-                        <p class="text-xs text-slate-500 mt-1">วันที่ <span id="print-sign-date"></span></p>
+                        <div class="w-[45%]">
+                            <table class="w-full text-sm">
+                                <tbody id="print-totals-tbody">
+                                    <!-- Totals will be injected here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-6 text-center text-[12px] border-t-2 border-slate-400 pt-6 mt-6 shrink-0 relative">
+                        <div>
+                            <div class="border-b border-slate-400 w-40 mx-auto mb-1 h-12"></div>
+                            <p class="font-medium text-slate-800">ผู้รับเอกสาร</p>
+                            <p class="text-[10px] text-slate-500 mt-1">วันที่ _______/_______/_______</p>
+                        </div>
+                        <div class="relative">
+                            <div class="border-b border-slate-400 w-40 mx-auto mb-1 h-12 flex items-end justify-center">
+                                <span class="text-emerald-800 font-serif italic text-lg border-2 border-emerald-500 rounded-full px-3 py-0.5 rotate-[15deg] opacity-70 absolute top-[-15px] bg-white">Approved</span>
+                            </div>
+                            <p class="font-medium text-slate-800">ผู้อนุมัติ / ผู้รับมอบอำนาจ</p>
+                            <p class="text-[10px] text-slate-500 mt-1">วันที่ <span id="print-sign-date"></span></p>
+                        </div>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
@@ -222,12 +223,9 @@
     <!-- ================== Main Layout (SPA) ================== -->
     <div id="main-layout" class="hidden flex h-screen overflow-hidden bg-slate-50 relative">
         
-        <!-- Mobile Sidebar Overlay (z-40 ให้อยู่ใต้ sidebar แต่บังหน้าหลัก) -->
         <div id="sidebar-overlay" onclick="window.app.toggleMobileSidebar()" class="fixed inset-0 bg-slate-900/60 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
 
-        <!-- Sidebar Navigation (z-50 ให้อยู่บนสุด) -->
         <aside id="sidebar" class="sidebar-bg flex flex-col shadow-2xl z-50 border-r border-slate-800 fixed md:relative h-full top-0 left-0 w-64 -translate-x-full md:translate-x-0">
-            <!-- Overlay สีเข้มทับรูปภาพพื้นหลัง เพื่อให้อ่านตัวหนังสือสีขาวได้ชัดเจน -->
             <div class="absolute inset-0 bg-slate-900/85 z-0"></div> 
             
             <div class="relative z-10 flex flex-col h-full">
@@ -1350,7 +1348,7 @@
                     <td class="py-2 px-2 text-right">${formatNum(i.price)}</td>
                     <td class="py-2 px-2 text-right font-medium">${formatNum(i.qty * i.price)}</td>
                 </tr>
-            `).join('') + Array(Math.max(0, 3 - docData.items.length)).fill('<tr><td colspan="5" class="py-3 border-b border-slate-50"></td></tr>').join('');
+            `).join('') + Array(Math.max(0, 5 - docData.items.length)).fill('<tr><td colspan="5" class="py-3 border-b border-slate-50"></td></tr>').join('');
 
             el('print-doc-notes').textContent = docData.notes || '-';
             if (docData.type === 'RE') el('print-stamp-paid').classList.remove('hidden');
