@@ -573,10 +573,10 @@
 
                 const initDB = () => {
                     onSnapshot(doc(db, publicPath, 'settings', 'profile'), snap => { if(snap.exists()) company.value = snap.data(); });
-                    onSnapshot(collection(db, publicPath, 'customers'), snap => customers.value = snap.docs.map(d => ({id: d.id, ...d.data()})));
-                    onSnapshot(collection(db, publicPath, 'products'), snap => products.value = snap.docs.map(d => ({id: d.id, ...d.data()})));
-                    onSnapshot(collection(db, publicPath, 'documents'), snap => documents.value = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => b.id.localeCompare(a.id)));
-                    onSnapshot(collection(db, publicPath, 'employees'), snap => employees.value = snap.docs.map(d => ({id: d.id, ...d.data()})));
+                    onSnapshot(collection(db, publicPath, 'customers'), snap => customers.value = snap.docs.map(d => ({...d.data(), id: d.id})));
+                    onSnapshot(collection(db, publicPath, 'products'), snap => products.value = snap.docs.map(d => ({...d.data(), id: d.id})));
+                    onSnapshot(collection(db, publicPath, 'documents'), snap => documents.value = snap.docs.map(d => ({...d.data(), id: d.id})).sort((a,b) => b.id.localeCompare(a.id)));
+                    onSnapshot(collection(db, publicPath, 'employees'), snap => employees.value = snap.docs.map(d => ({...d.data(), id: d.id})));
                 };
 
                 const handleLogin = () => {
@@ -699,7 +699,8 @@
                 const openCustomerForm = () => { customerForm.value = { id: '', name: '', address: '', taxId: '', phone: '', email: '' }; isCustomerModalOpen.value = true; };
                 const saveCustomer = () => {
                     const cid = 'C' + Date.now().toString().slice(-6);
-                    setDoc(doc(db, publicPath, 'customers', cid), customerForm.value).catch(e=>console.log(e));
+                    const dataToSave = { ...customerForm.value, id: cid };
+                    setDoc(doc(db, publicPath, 'customers', cid), dataToSave).catch(e=>console.log(e));
                     formData.value.customerId = cid; isCustomerModalOpen.value = false;
                     Swal.fire({title: 'สำเร็จ', icon: 'success', timer: 1000, showConfirmButton: false});
                 };
@@ -707,7 +708,8 @@
                 const openProductForm = () => { productForm.value = { id: '', code: '', name: '', price: 0 }; isProductModalOpen.value = true; };
                 const saveProduct = () => {
                     const pid = 'P' + Date.now().toString().slice(-6);
-                    setDoc(doc(db, publicPath, 'products', pid), productForm.value).catch(e=>console.log(e));
+                    const dataToSave = { ...productForm.value, id: pid };
+                    setDoc(doc(db, publicPath, 'products', pid), dataToSave).catch(e=>console.log(e));
                     isProductModalOpen.value = false;
                     Swal.fire({title: 'สำเร็จ', icon: 'success', timer: 1000, showConfirmButton: false});
                 };
