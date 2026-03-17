@@ -68,13 +68,13 @@
     <div id="global-loading" class="fixed inset-0 bg-white z-[100] flex items-center justify-center">
         <div class="text-center">
             <i class="fas fa-circle-notch fa-spin text-5xl text-emerald-600 mb-4"></i>
-            <p class="text-slate-500 font-medium">กำลังโหลดข้อมูล...</p>
+            <p class="text-slate-500 font-medium mt-3">กำลังโหลดข้อมูล...</p>
         </div>
     </div>
 
     <!-- ================== AUTH VIEW (Login/Setup) ================== -->
     <div id="view-auth" class="hidden min-h-screen flex items-center justify-center bg-slate-100 p-4 relative z-50">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200">
             <div class="bg-emerald-600 p-6 text-center text-white">
                 <i class="fas fa-file-invoice-dollar text-4xl mb-2"></i>
                 <h2 id="auth-title" class="text-2xl font-bold">เข้าสู่ระบบ</h2>
@@ -98,25 +98,36 @@
                 <button type="submit" id="auth-submit-btn" class="w-full bg-emerald-600 text-white font-bold rounded-lg px-4 py-3 hover:bg-emerald-700 transition shadow-md">
                     เข้าสู่ระบบ
                 </button>
+
+                <!-- ปุ่มตั้งค่าระบบครั้งแรก (ช่วยให้สร้าง Admin ได้เสมอ) -->
+                <div class="text-center mt-4 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="window.app.toggleSetupMode()" id="auth-toggle-btn" class="text-xs text-slate-400 hover:text-emerald-600 font-medium transition-colors">
+                        <i class="fas fa-cog mr-1"></i> สำหรับการใช้งานครั้งแรก (สร้าง Admin)
+                    </button>
+                </div>
             </form>
         </div>
     </div>
 
     <!-- ================== Print View (Hidden by default) ================== -->
-    <div id="print-modal" class="hidden fixed inset-0 bg-slate-800/90 z-50 overflow-auto flex-col items-center py-8 px-4 flex">
+    <div id="print-modal" class="hidden fixed inset-0 bg-slate-800/95 z-50 flex-col overflow-hidden py-4 px-2 sm:py-8 sm:px-4 flex">
+        
         <!-- Controls -->
-        <div class="no-print bg-white p-4 rounded-xl shadow-lg flex flex-wrap justify-center gap-3 mb-8 sticky top-4 z-10 w-full max-w-sm border border-slate-200 shrink-0">
-            <button onclick="window.app.triggerPrint()" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center flex-1 justify-center transition shadow-sm font-semibold"><i class="fas fa-print mr-2"></i> พิมพ์เอกสาร</button>
-            <button onclick="window.app.closePrint()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg flex items-center justify-center transition shadow-sm font-semibold"><i class="fas fa-times mr-2"></i> ปิดหน้าต่าง</button>
+        <div class="no-print bg-white p-3 sm:p-4 rounded-xl shadow-lg flex flex-wrap justify-center gap-2 sm:gap-3 mb-4 shrink-0 w-full max-w-lg mx-auto border border-slate-200">
+            <button onclick="window.app.triggerPrint()" class="px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center flex-1 justify-center transition shadow-sm font-semibold text-sm sm:text-base"><i class="fas fa-print mr-2"></i> พิมพ์ / PDF</button>
+            <button onclick="window.app.closePrint()" class="px-4 py-2 sm:py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg flex items-center justify-center transition shadow-sm font-semibold text-sm sm:text-base"><i class="fas fa-times mr-2"></i> ปิด</button>
         </div>
 
-        <div class="w-full overflow-x-auto flex justify-start sm:justify-center pb-8">
-            <div id="print-section" class="bg-white w-[210mm] min-w-[210mm] h-[297mm] min-h-[297mm] shrink-0 shadow-2xl p-[15mm] text-slate-800 box-border flex flex-col origin-top scale-[0.45] md:scale-100 print:scale-100 print:shadow-none mt-[-25%] md:mt-0 overflow-hidden">
+        <!-- A4 Paper Container (Scrollable) -->
+        <div class="flex-1 overflow-auto w-full flex justify-center pb-12">
+            <!-- ขนาดกระดาษ A4 ตายตัว 100% ป้องกันหน้าพัง -->
+            <div id="print-section" class="bg-white text-slate-800 box-border flex flex-col shadow-2xl shrink-0 print:shadow-none" style="width: 210mm; min-height: 297mm; padding: 15mm; margin: 0 auto;">
                 
-                <div class="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-4 shrink-0">
-                    <div class="flex items-start">
-                        <img id="print-logo" src="" alt="Logo" class="hidden h-16 w-auto object-contain mr-4 shrink-0" style="max-width: 180px;">
-                        <div id="print-logo-placeholder" class="w-16 h-16 shrink-0 bg-emerald-600 text-white flex items-center justify-center font-bold text-xl rounded shadow mr-4">LOGO</div>
+                <!-- ส่วนหัวเอกสาร: แก้ไขช่องว่างโลโก้ให้พอดี -->
+                <div class="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-5 shrink-0">
+                    <div class="flex items-start gap-4">
+                        <img id="print-logo" src="" alt="Logo" class="hidden h-16 w-auto object-contain shrink-0" style="max-width: 180px;">
+                        <div id="print-logo-placeholder" class="w-16 h-16 shrink-0 bg-emerald-600 text-white flex items-center justify-center font-bold text-xl rounded shadow">LOGO</div>
                         
                         <div class="max-w-[300px]">
                             <h1 id="print-company-name" class="text-xl font-bold text-emerald-900 leading-tight mb-1"></h1>
@@ -136,28 +147,30 @@
                     </div>
                 </div>
 
-                <div class="flex justify-between mb-4 shrink-0">
+                <!-- ส่วนข้อมูลลูกค้า -->
+                <div class="flex justify-between mb-5 shrink-0">
                     <div class="w-[60%] border border-slate-300 p-3 rounded min-h-[90px]">
                         <h3 class="text-xs font-bold text-slate-500 mb-1 border-b border-slate-200 pb-1">ลูกค้า (Customer)</h3>
-                        <p id="print-cust-name" class="font-bold text-sm"></p>
-                        <p id="print-cust-addr" class="text-xs mt-1"></p>
-                        <p class="text-xs mt-1">เลขประจำตัวผู้เสียภาษี: <span id="print-cust-tax"></span></p>
-                        <p class="text-xs mt-1">โทร: <span id="print-cust-phone"></span> | อีเมล: <span id="print-cust-email"></span></p>
+                        <p id="print-cust-name" class="font-bold text-sm text-slate-800"></p>
+                        <p id="print-cust-addr" class="text-xs mt-1 text-slate-700"></p>
+                        <p class="text-xs mt-1 text-slate-700">เลขประจำตัวผู้เสียภาษี: <span id="print-cust-tax"></span></p>
+                        <p class="text-xs mt-1 text-slate-700">โทร: <span id="print-cust-phone"></span> | อีเมล: <span id="print-cust-email"></span></p>
                     </div>
                     <div class="w-[35%] border border-slate-300 p-3 rounded min-h-[90px] flex flex-col justify-center text-sm">
-                        <div class="flex justify-between mb-1"><span class="text-slate-500">เงื่อนไขชำระ:</span> <span>30 วัน</span></div>
-                        <div class="flex justify-between mb-1"><span class="text-slate-500">วันครบกำหนด:</span> <span id="print-doc-due"></span></div>
+                        <div class="flex justify-between mb-1"><span class="text-slate-500">เงื่อนไขชำระ:</span> <span class="font-medium">30 วัน</span></div>
+                        <div class="flex justify-between mb-1"><span class="text-slate-500">วันครบกำหนด:</span> <span id="print-doc-due" class="font-medium"></span></div>
                     </div>
                 </div>
 
-                <div class="flex-1">
-                    <table class="w-full text-sm border-collapse mb-4">
+                <!-- ส่วนตารางรายการ (flex-1 เพื่อให้ดันส่วนท้ายลงไป) -->
+                <div class="flex-1 mb-6">
+                    <table class="w-full text-sm border-collapse">
                         <thead>
                             <tr class="bg-slate-100 border-y-2 border-slate-400">
-                                <th class="py-2 px-2 text-left w-12">ลำดับ</th>
-                                <th class="py-2 px-2 text-left">รายละเอียดสินค้า/บริการ</th>
-                                <th class="py-2 px-2 text-right w-20">จำนวน</th>
-                                <th class="py-2 px-2 text-right w-24">ราคา/หน่วย</th>
+                                <th class="py-2 px-2 text-center w-12 border-r border-white">ลำดับ</th>
+                                <th class="py-2 px-2 text-left border-r border-white">รายละเอียดสินค้า/บริการ</th>
+                                <th class="py-2 px-2 text-right w-20 border-r border-white">จำนวน</th>
+                                <th class="py-2 px-2 text-right w-24 border-r border-white">ราคา/หน่วย</th>
                                 <th class="py-2 px-2 text-right w-32">จำนวนเงิน</th>
                             </tr>
                         </thead>
@@ -167,16 +180,18 @@
                     </table>
                 </div>
 
-                <div class="flex justify-between shrink-0">
+                <!-- ส่วนสรุปยอดและหมายเหตุ -->
+                <div class="flex justify-between shrink-0 border-t border-slate-300 pt-4">
                     <div class="w-1/2 pr-8">
-                        <div class="border border-slate-300 p-2 rounded h-20 mb-2 text-xs text-slate-600">
-                            <span class="font-bold">หมายเหตุ:</span><br/><span id="print-doc-notes"></span>
+                        <div class="border border-slate-300 p-3 rounded h-full min-h-[80px] text-xs text-slate-700">
+                            <span class="font-bold text-slate-500 mb-1 block border-b border-slate-200 pb-1">หมายเหตุ:</span>
+                            <span id="print-doc-notes" class="whitespace-pre-wrap"></span>
                         </div>
-                        <div id="print-stamp-paid" class="hidden text-xs bg-green-50 text-green-800 p-2 border border-green-200 rounded flex items-center">
-                            <i class="fas fa-check-circle mr-1"></i> ชำระเงินเรียบร้อยแล้ว
+                        <div id="print-stamp-paid" class="hidden text-sm bg-green-50 text-green-800 p-2 border border-green-200 rounded flex items-center justify-center font-bold mt-2">
+                            <i class="fas fa-check-circle mr-2 text-lg"></i> ชำระเงินเรียบร้อยแล้ว
                         </div>
                     </div>
-                    <div class="w-1/2">
+                    <div class="w-[40%]">
                         <table class="w-full text-sm">
                             <tbody id="print-totals-tbody">
                                 <!-- Totals will be injected here -->
@@ -185,17 +200,18 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-8 text-center text-sm border-t border-slate-200 pt-6 mt-auto shrink-0">
+                <!-- ส่วนลายเซ็น ดันไปด้านล่างสุดเสมอด้วย mt-auto -->
+                <div class="grid grid-cols-2 gap-8 text-center text-sm border-t-2 border-slate-400 pt-8 mt-10 shrink-0 relative">
                     <div>
                         <div class="border-b border-slate-400 w-48 mx-auto mb-2 h-16"></div>
-                        <p>ผู้รับเอกสาร</p>
+                        <p class="font-medium text-slate-800">ผู้รับเอกสาร</p>
                         <p class="text-xs text-slate-500 mt-1">วันที่ _______/_______/_______</p>
                     </div>
-                    <div>
+                    <div class="relative">
                         <div class="border-b border-slate-400 w-48 mx-auto mb-2 h-16 flex items-end justify-center pb-1">
-                            <span class="text-emerald-800 font-serif italic text-xl border-2 border-emerald-500 rounded-full px-4 py-1 rotate-[-10deg] opacity-70">Approved</span>
+                            <span class="text-emerald-800 font-serif italic text-xl border-2 border-emerald-500 rounded-full px-4 py-1 rotate-[15deg] opacity-70 absolute top-[-10px] bg-white">Approved</span>
                         </div>
-                        <p>ผู้อนุมัติ / ผู้รับมอบอำนาจ</p>
+                        <p class="font-medium text-slate-800">ผู้อนุมัติ / ผู้รับมอบอำนาจ</p>
                         <p class="text-xs text-slate-500 mt-1">วันที่ <span id="print-sign-date"></span></p>
                     </div>
                 </div>
@@ -741,6 +757,7 @@
                             window.appState.isSetupMode = true;
                             el('auth-title').textContent = 'สร้างบัญชีผู้ดูแลระบบ (Admin)';
                             el('auth-submit-btn').textContent = 'สร้างบัญชี Admin';
+                            el('auth-toggle-btn').classList.add('hidden'); // ซ่อนปุ่ม Setup
                             Swal.fire({
                                 title: 'ตั้งค่าการใช้งานครั้งแรก',
                                 text: 'ระบบยังไม่มีผู้ดูแล กรุณาสร้างบัญชีสำหรับผู้ดูแลระบบ (Admin)',
@@ -750,6 +767,7 @@
                             window.appState.isSetupMode = false;
                             el('auth-title').textContent = 'เข้าสู่ระบบ';
                             el('auth-submit-btn').textContent = 'เข้าสู่ระบบ';
+                            el('auth-toggle-btn').classList.remove('hidden'); // โชว์ปุ่มเผื่อลืมหรือสร้างไม่สำเร็จ
                         }
                         el('view-auth').classList.remove('hidden');
                         el('main-layout').classList.add('hidden');
@@ -780,15 +798,29 @@
                     if (err.code === 'auth/configuration-not-found') {
                         Swal.fire({
                             title: 'ตรวจสอบการตั้งค่า Firebase',
-                            html: 'ไม่สามารถสร้างบัญชีผู้ดูแลระบบได้ เนื่องจากยังไม่ได้เปิดใช้งาน <b>Anonymous Auth</b><br><br>กรุณาไปที่ Firebase Console > Authentication > Sign-in method และเปิดใช้งาน Anonymous',
+                            html: 'ไม่สามารถสร้างบัญชีผู้ดูแลระบบอัตโนมัติได้ เนื่องจากยังไม่ได้เปิดใช้งาน <b>Anonymous Auth</b><br><br>กรุณากดปุ่ม <b>"สำหรับการใช้งานครั้งแรก (สร้าง Admin)"</b> ด้านล่างเพื่อดำเนินการต่อ',
                             icon: 'warning'
                         });
+                        el('auth-toggle-btn').classList.remove('hidden');
                     } else {
                         console.error("Auth Error:", err);
                     }
                 });
             }
         });
+
+        window.app.toggleSetupMode = () => {
+            window.appState.isSetupMode = !window.appState.isSetupMode;
+            if(window.appState.isSetupMode) {
+                el('auth-title').textContent = 'สร้างบัญชีผู้ดูแลระบบ (Admin)';
+                el('auth-submit-btn').textContent = 'สร้างบัญชี Admin';
+                el('auth-toggle-btn').innerHTML = '<i class="fas fa-sign-in-alt mr-1"></i> กลับไปหน้าเข้าสู่ระบบ';
+            } else {
+                el('auth-title').textContent = 'เข้าสู่ระบบ';
+                el('auth-submit-btn').textContent = 'เข้าสู่ระบบ';
+                el('auth-toggle-btn').innerHTML = '<i class="fas fa-cog mr-1"></i> สำหรับการใช้งานครั้งแรก (สร้าง Admin)';
+            }
+        };
 
         window.app.handleAuth = async (e) => {
             e.preventDefault();
@@ -814,7 +846,7 @@
                 console.error(err);
                 let msg = 'เกิดข้อผิดพลาด กรุณาลองใหม่';
                 if(err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') msg = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
-                if(err.code === 'auth/email-already-in-use') msg = 'อีเมลนี้ถูกใช้งานแล้ว';
+                if(err.code === 'auth/email-already-in-use') msg = 'อีเมลนี้ถูกใช้งานแล้ว ให้กลับไปหน้าเข้าสู่ระบบ';
                 if(err.code === 'auth/weak-password') msg = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
                 Swal.fire('ข้อผิดพลาด', msg, 'error');
             }
