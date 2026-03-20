@@ -10,7 +10,7 @@ interface DocumentFormProps {
 }
 
 export default function DocumentForm({ initialData, onSave, onCancel }: DocumentFormProps) {
-  const { customers, products, addDocument, updateDocument, companyInfo } = useStore();
+  const { documents, customers, products, addDocument, updateDocument, companyInfo } = useStore();
   
   const [docType, setDocType] = useState<Document['type']>(initialData?.type || 'QUOTATION');
   const [docNumber, setDocNumber] = useState(initialData?.docNumber || '');
@@ -109,7 +109,9 @@ export default function DocumentForm({ initialData, onSave, onCancel }: Document
       company: companyInfo, // Snapshot of company info at time of creation
     };
 
-    if (initialData) {
+    const isExisting = documents.some(d => d.id === initialData?.id);
+
+    if (isExisting && initialData) {
       updateDocument(initialData.id, docData);
     } else {
       addDocument(docData);
