@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useStore } from '../store';
-import { Plus, Search, FileText, Trash2, Printer, Edit2, Download, Upload } from 'lucide-react';
+import { Plus, Search, FileText, Trash2, Printer, Edit2, Download, Upload, FileStack } from 'lucide-react';
 import { motion } from 'motion/react';
 import DocumentForm from './DocumentForm';
 import DocumentPrint from '../components/DocumentPrint';
@@ -38,6 +38,28 @@ export function Documents() {
     setTimeout(() => {
       window.print();
     }, 500);
+  };
+
+  const handleConvert = (doc: Document, targetType: Document['type']) => {
+    const prefix = 
+      targetType === 'QUOTATION' ? 'QT' : 
+      targetType === 'INVOICE' ? 'INV' : 'RE';
+    const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+    const randomStr = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const newDocNumber = `${prefix}-${dateStr}-${randomStr}`;
+
+    const newDoc: Document = {
+      ...doc,
+      id: crypto.randomUUID(),
+      type: targetType,
+      docNumber: newDocNumber,
+      date: new Date().toISOString().split('T')[0],
+      status: 'PENDING',
+      notes: `อ้างอิงจาก ${doc.docNumber}\n${doc.notes || ''}`
+    };
+
+    setSelectedDoc(newDoc);
+    setView('FORM');
   };
 
   const handleExport = () => {
@@ -218,7 +240,8 @@ export function Documents() {
                         doc.type === 'INVOICE' ? 'bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200' :
                         'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       }`}>
-                        {doc.type === 'QUOTATION' ? 'ใบเสนอราคา' : doc.type === 'INVOICE' ? 'ใบแจ้งหนี้' : 'ใบเสร็จรับเงิน'}
+                        {doc.type === 'QUOTATION' ? 'ใบเสนอราคา' : 
+                         doc.type === 'INVOICE' ? 'ใบแจ้งหนี้' : 'ใบเสร็จรับเงิน'}
                       </span>
                     </td>
                     <td className="p-4 text-sm text-slate-600">{new Date(doc.date).toLocaleDateString('th-TH')}</td>
@@ -233,6 +256,24 @@ export function Documents() {
                       </span>
                     </td>
                     <td className="p-4 text-right space-x-1">
+                      {doc.type === 'QUOTATION' && (
+                        <button 
+                          onClick={() => handleConvert(doc, 'INVOICE')}
+                          className="p-2 text-slate-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50"
+                          title="แปลงเป็นใบแจ้งหนี้"
+                        >
+                          <FileStack className="w-4 h-4" />
+                        </button>
+                      )}
+                      {doc.type === 'INVOICE' && (
+                        <button 
+                          onClick={() => handleConvert(doc, 'RECEIPT')}
+                          className="p-2 text-slate-400 hover:text-emerald-600 transition-colors rounded-lg hover:bg-emerald-50"
+                          title="แปลงเป็นใบเสร็จ"
+                        >
+                          <FileStack className="w-4 h-4" />
+                        </button>
+                      )}
                       <button 
                         onClick={() => handlePrint(doc)}
                         className="p-2 text-slate-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50"

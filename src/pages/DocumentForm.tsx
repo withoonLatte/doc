@@ -29,7 +29,9 @@ export default function DocumentForm({ initialData, onSave, onCancel }: Document
   // Generate Document Number if new
   useEffect(() => {
     if (!initialData) {
-      const prefix = docType === 'QUOTATION' ? 'QT' : docType === 'INVOICE' ? 'INV' : 'RE';
+      const prefix = 
+        docType === 'QUOTATION' ? 'QT' : 
+        docType === 'INVOICE' ? 'INV' : 'RE';
       const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
       const randomStr = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
       setDocNumber(`${prefix}-${dateStr}-${randomStr}`);
