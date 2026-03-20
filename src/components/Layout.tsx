@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutDashboard, FileText, Users, Package, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, Package, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, User as UserIcon } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useAuth } from '../contexts/AuthContext';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -11,33 +12,87 @@ export function cn(...inputs: ClassValue[]) {
 export function Layout({ children, activeTab, setActiveTab }: { children: React.ReactNode, activeTab: string, setActiveTab: (t: string) => void }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const { user, logout } = useAuth();
 
-  const navItems = [
-    { id: 'dashboard', label: 'ภาพรวม', icon: LayoutDashboard },
-    { id: 'documents', label: 'เอกสาร', icon: FileText },
-    { id: 'customers', label: 'ลูกค้า', icon: Users },
-    { id: 'products', label: 'สินค้า/บริการ', icon: Package },
-    { id: 'settings', label: 'ตั้งค่าบริษัท', icon: Settings },
+  const allNavItems = [
+    { id: 'dashboard', label: 'ภาพรวม', icon: LayoutDashboard, roles: ['admin', 'staff'] },
+    { id: 'documents', label: 'เอกสาร', icon: FileText, roles: ['admin', 'staff'] },
+    { id: 'customers', label: 'ลูกค้า', icon: Users, roles: ['admin', 'staff'] },
+    { id: 'products', label: 'สินค้า/บริการ', icon: Package, roles: ['admin', 'staff'] },
+    { id: 'settings', label: 'ตั้งค่าบริษัท', icon: Settings, roles: ['admin'] },
   ];
+
+  const navItems = allNavItems.filter(item => item.roles.includes(user?.role || ''));
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar Desktop */}
       <aside 
         className={cn(
-          "hidden md:flex flex-col bg-slate-50 border-r border-slate-200 transition-all duration-300 relative",
+          "hidden md:flex flex-col border-r border-slate-200 transition-all duration-300 relative overflow-hidden",
           isSidebarCollapsed ? "w-20" : "w-64"
         )}
       >
-        <div className={cn("p-6 flex items-center", isSidebarCollapsed ? "justify-center" : "justify-between")}>
+        {/* Background Image */}
+        <div 
+          className="absolute inset-0 z-0 opacity-90"
+          style={{
+            backgroundImage: 'url("https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?q=80&w=1000&auto=format&fit=crop")',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        />
+        {/* Overlay to ensure readability */}
+        <div className="absolute inset-0 z-10 bg-slate-900/10 backdrop-blur-[2px]" />
+
+        <div className={cn("p-6 flex items-center relative z-20", isSidebarCollapsed ? "justify-center" : "justify-between")}>
           <h1 className="text-2xl font-black flex items-center gap-2">
-            <FileText className="w-7 h-7 text-blue-600 shrink-0" />
+            <FileText className="w-7 h-7 text-white shrink-0 drop-shadow-md" />
             {!isSidebarCollapsed && (
-              <span className="bg-gradient-to-r from-blue-600 to-fuchsia-500 bg-clip-text text-transparent truncate">DocFlow</span>
+              <span className="text-white drop-shadow-md truncate">DocFlow</span>
             )}
           </h1>
+          {!isSidebarCollapsed && (
+            <button 
+              onClick={() => setIsSidebarCollapsed(true)}
+              className="p-1.5 rounded-lg text-white/80 hover:bg-white/20 transition-colors"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
         </div>
-        <nav className="flex-1 px-4 space-y-1 mt-2">
+
+        {isSidebarCollapsed && (
+          <div className="flex justify-center mb-4 relative z-20">
+            <button 
+              onClick={() => setIsSidebarCollapsed(false)}
+              className="p-2 rounded-xl text-white/80 hover:bg-white/20 transition-colors"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+          </div>
+        )}
+
+        {/* User Profile Summary */}
+        {!isSidebarCollapsed && (
+          <div className="px-6 mb-6 relative z-20">
+            <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                  <UserIcon className="w-5 h-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-white truncate">{user?.name}</p>
+                  <p className="text-[10px] font-medium text-white/70 uppercase tracking-wider">
+                    {user?.role === 'admin' ? 'ผู้ดูแลระบบ' : 'พนักงาน'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <nav className="flex-1 px-4 space-y-1 mt-2 relative z-20">
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -49,8 +104,8 @@ export function Layout({ children, activeTab, setActiveTab }: { children: React.
                   "w-full flex items-center gap-3 py-3 rounded-xl text-sm font-medium transition-all duration-200",
                   isSidebarCollapsed ? "justify-center px-0" : "px-4",
                   activeTab === item.id
-                    ? "bg-white text-blue-600 shadow-sm border border-slate-100"
-                    : "text-slate-500 hover:bg-slate-100/50 hover:text-slate-900"
+                    ? "bg-white/20 text-white shadow-lg border border-white/30 backdrop-blur-md"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
                 )}
               >
                 <Icon className="w-5 h-5 shrink-0" />
@@ -60,14 +115,17 @@ export function Layout({ children, activeTab, setActiveTab }: { children: React.
           })}
         </nav>
 
-        {/* Collapse Toggle */}
-        <div className="p-4 border-t border-slate-200 flex justify-center">
+        <div className="px-4 mb-8 relative z-20">
           <button
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-            title={isSidebarCollapsed ? "ขยายเมนู" : "ย่อเมนู"}
+            onClick={logout}
+            className={cn(
+              "w-full flex items-center gap-3 py-3 rounded-xl text-sm font-medium text-white/80 hover:bg-rose-500/20 hover:text-rose-200 transition-all duration-200",
+              isSidebarCollapsed ? "justify-center px-0" : "px-4"
+            )}
+            title={isSidebarCollapsed ? "ออกจากระบบ" : undefined}
           >
-            {isSidebarCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+            <LogOut className="w-5 h-5 shrink-0" />
+            {!isSidebarCollapsed && <span>ออกจากระบบ</span>}
           </button>
         </div>
       </aside>
@@ -90,8 +148,20 @@ export function Layout({ children, activeTab, setActiveTab }: { children: React.
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="md:hidden fixed top-16 left-0 right-0 bg-white border-b border-slate-200 z-40 p-4 shadow-lg"
+            className="md:hidden fixed top-16 left-0 right-0 bg-white border-b border-slate-200 z-40 p-4 shadow-lg max-h-[calc(100vh-4rem)] overflow-y-auto"
           >
+            <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl mb-4">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                <UserIcon className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-800 truncate">{user?.name}</p>
+                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
+                  {user?.role === 'admin' ? 'ผู้ดูแลระบบ' : 'พนักงาน'}
+                </p>
+              </div>
+            </div>
+
             <nav className="space-y-2">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -111,6 +181,15 @@ export function Layout({ children, activeTab, setActiveTab }: { children: React.
                   </button>
                 );
               })}
+              <div className="pt-2 mt-2 border-t border-slate-100">
+                <button
+                  onClick={() => { logout(); setIsMobileMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-rose-500 hover:bg-rose-50 transition-all"
+                >
+                  <LogOut className="w-5 h-5" />
+                  <span>ออกจากระบบ</span>
+                </button>
+              </div>
             </nav>
           </motion.div>
         )}

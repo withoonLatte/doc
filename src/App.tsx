@@ -10,9 +10,16 @@ import { Documents } from './pages/Documents';
 import Customers from './pages/Customers';
 import Products from './pages/Products';
 import Settings from './pages/Settings';
+import { Login } from './pages/Login';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
-export default function App() {
+function AppContent() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
 
   const renderContent = () => {
     switch (activeTab) {
@@ -35,5 +42,13 @@ export default function App() {
     <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
       {renderContent()}
     </Layout>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

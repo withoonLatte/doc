@@ -1,12 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { Save, Building2, MapPin, Phone, Mail, FileText, Upload } from 'lucide-react';
+import { Save, Building2, MapPin, Phone, Mail, FileText, Upload, Users, Plus, Trash2, Shield, User as UserIcon } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { Role } from '../types';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export default function Settings() {
   const { companyInfo, updateCompanyInfo } = useStore();
+  const { allUsers, addUser, deleteUser, user: currentUser } = useAuth();
   const [formData, setFormData] = useState(companyInfo);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Staff form state
+  const [showStaffForm, setShowStaffForm] = useState(false);
+  const [newStaff, setNewStaff] = useState({
+    username: '',
+    password: '',
+    name: '',
+    role: 'staff' as Role
+  });
 
   useEffect(() => {
     setFormData(companyInfo);
@@ -36,18 +54,27 @@ export default function Settings() {
     }
   };
 
+  const handleAddStaff = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStaff.username || !newStaff.password || !newStaff.name) return;
+    
+    addUser(newStaff);
+    setNewStaff({ username: '', password: '', name: '', role: 'staff' });
+    setShowStaffForm(false);
+  };
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-8 pb-12">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">ตั้งค่าบริษัท</h1>
+        <h1 className="text-2xl font-bold text-slate-800">ตั้งค่าระบบ</h1>
         <p className="text-slate-500 mt-1">
-          ข้อมูลนี้จะถูกนำไปใช้เป็นส่วนหัวของเอกสารต่างๆ เช่น ใบเสนอราคา, ใบแจ้งหนี้
+          จัดการข้อมูลบริษัทและพนักงานในระบบ
         </p>
       </div>
 
+      {/* Company Info Form */}
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-6 sm:p-8 space-y-8">
-          
           {/* Logo Section */}
           <div>
             <h3 className="text-lg font-medium text-slate-800 mb-4 flex items-center gap-2">
@@ -115,7 +142,7 @@ export default function Settings() {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
               
@@ -127,7 +154,7 @@ export default function Settings() {
                   type="text"
                   value={formData.taxId}
                   onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
 
@@ -140,7 +167,7 @@ export default function Settings() {
                   rows={3}
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all"
                 />
               </div>
 
@@ -153,7 +180,7 @@ export default function Settings() {
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
 
@@ -166,7 +193,7 @@ export default function Settings() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
               
@@ -178,13 +205,12 @@ export default function Settings() {
                   type="url"
                   value={formData.website || ''}
                   onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   placeholder="https://www.example.com"
                 />
               </div>
             </div>
           </div>
-
         </div>
         
         <div className="bg-slate-50 p-6 sm:px-8 border-t border-slate-100 flex items-center justify-between">
@@ -210,6 +236,145 @@ export default function Settings() {
           </button>
         </div>
       </form>
+
+      {/* Staff Management Section */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-6 sm:p-8">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-medium text-slate-800 flex items-center gap-2">
+              <Users className="w-5 h-5 text-blue-500" />
+              จัดการพนักงาน
+            </h3>
+            <button
+              onClick={() => setShowStaffForm(!showStaffForm)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors text-sm font-bold"
+            >
+              <Plus className="w-4 h-4" />
+              เพิ่มพนักงาน
+            </button>
+          </div>
+
+          {showStaffForm && (
+            <div className="mb-8 p-6 bg-slate-50 rounded-2xl border border-slate-100">
+              <h4 className="font-bold text-slate-800 mb-4">ข้อมูลพนักงานใหม่</h4>
+              <form onSubmit={handleAddStaff} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">ชื่อ-นามสกุล</label>
+                  <input
+                    type="text"
+                    required
+                    value={newStaff.name}
+                    onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="ชื่อพนักงาน"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">ชื่อผู้ใช้ (Username)</label>
+                  <input
+                    type="text"
+                    required
+                    value={newStaff.username}
+                    onChange={(e) => setNewStaff({ ...newStaff, username: e.target.value })}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="username"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">รหัสผ่าน</label>
+                  <input
+                    type="password"
+                    required
+                    value={newStaff.password}
+                    onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="••••••"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">ระดับสิทธิ์</label>
+                  <select
+                    value={newStaff.role}
+                    onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value as Role })}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="staff">พนักงาน (Staff)</option>
+                    <option value="admin">ผู้ดูแลระบบ (Admin)</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2 flex justify-end gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowStaffForm(false)}
+                    className="px-4 py-2 text-slate-500 hover:bg-slate-200 rounded-xl transition-colors text-sm font-bold"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-sm font-bold shadow-sm"
+                  >
+                    บันทึกพนักงาน
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left border-b border-slate-100">
+                  <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">พนักงาน</th>
+                  <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">ชื่อผู้ใช้</th>
+                  <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">สิทธิ์</th>
+                  <th className="pb-3 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {allUsers.map((u) => (
+                  <tr key={u.id} className="group hover:bg-slate-50/50 transition-colors">
+                    <td className="py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                          <UserIcon className="w-4 h-4 text-slate-500" />
+                        </div>
+                        <span className="text-sm font-medium text-slate-700">{u.name}</span>
+                      </div>
+                    </td>
+                    <td className="py-4 text-sm text-slate-500">{u.username}</td>
+                    <td className="py-4">
+                      <span className={cn(
+                        "inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider",
+                        u.role === 'admin' ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-600"
+                      )}>
+                        <Shield className="w-3 h-3" />
+                        {u.role === 'admin' ? 'Admin' : 'Staff'}
+                      </span>
+                    </td>
+                    <td className="py-4 text-right">
+                      {u.id !== '1' && u.id !== currentUser?.id && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`ยืนยันการลบพนักงาน ${u.name}?`)) {
+                              deleteUser(u.id);
+                            }
+                          }}
+                          className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                          title="ลบพนักงาน"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
+

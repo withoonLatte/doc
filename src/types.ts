@@ -1,5 +1,14 @@
 export type DocType = 'QUOTATION' | 'INVOICE' | 'RECEIPT';
 
+export type Role = 'admin' | 'staff';
+
+export interface User {
+  id: string;
+  username: string;
+  name: string;
+  role: Role;
+}
+
 export interface Customer {
   id: string;
   name: string;
