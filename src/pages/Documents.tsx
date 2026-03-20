@@ -1,15 +1,17 @@
-import { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useStore } from '../store';
-import { Plus, Search, FileText, Trash2, Printer, Edit2 } from 'lucide-react';
+import { Plus, Search, FileText, Trash2, Printer, Edit2, Download, Upload } from 'lucide-react';
 import { motion } from 'motion/react';
 import DocumentForm from './DocumentForm';
 import DocumentPrint from '../components/DocumentPrint';
 import { Document } from '../types';
+import { exportToExcel, importFromExcel } from '../services/excelService';
 
 export function Documents() {
-  const { documents, deleteDocument } = useStore();
+  const { documents, deleteDocument, addDocument, customers, companyInfo } = useStore();
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('ALL');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [view, setView] = useState<'LIST' | 'FORM' | 'PRINT'>('LIST');
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
@@ -36,6 +38,59 @@ export function Documents() {
     setTimeout(() => {
       window.print();
     }, 500);
+  };
+
+  const handleExport = () => {
+    const exportData = documents.map(doc => ({
+      'เลขที่เอกสาร': doc.docNumber,
+      'ประเภท': doc.type,
+      'วันที่': new Date(doc.date).toLocaleDateString('th-TH'),
+      'ลูกค้า': doc.customer.name,
+      'ยอดรวมสุทธิ': doc.grandTotal,
+      'สถานะ': doc.status,
+      'จำนวนรายการ': doc.items.length
+    }));
+    exportToExcel(exportData, 'documents_list');
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const data = await importFromExcel(file);
+        let count = 0;
+        data.forEach((item: any) => {
+          // Simple import logic: find customer by name or use first one
+          const customerName = item['ลูกค้า'] || item.customerName;
+          const customer = customers.find(c => c.name === customerName) || customers[0];
+          
+          if (customer && item['เลขที่เอกสาร']) {
+            addDocument({
+              id: crypto.randomUUID(),
+              docNumber: String(item['เลขที่เอกสาร']),
+              type: (item['ประเภท'] || 'QUOTATION') as any,
+              date: new Date().toISOString(),
+              customer: customer,
+              items: [], // Items are hard to import from a flat sheet without a specific format
+              subtotal: Number(item['ยอดรวมสุทธิ'] || 0),
+              discount: 0,
+              taxRate: 7,
+              taxAmount: Number(item['ยอดรวมสุทธิ'] || 0) * 0.07,
+              grandTotal: Number(item['ยอดรวมสุทธิ'] || 0),
+              status: (item['สถานะ'] || 'PENDING') as any,
+              notes: 'Imported from Excel',
+              company: companyInfo
+            });
+            count++;
+          }
+        });
+        alert(`นำเข้าข้อมูลเอกสารสำเร็จ ${count} รายการ (เฉพาะข้อมูลเบื้องต้น)`);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      } catch (error) {
+        console.error('Import error:', error);
+        alert('เกิดข้อผิดพลาดในการนำเข้าข้อมูล');
+      }
+    }
   };
 
   if (view === 'FORM') {
@@ -77,13 +132,36 @@ export function Documents() {
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 print:hidden">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-slate-800 tracking-tight">เอกสารทั้งหมด</h2>
-        <button 
-          onClick={handleCreateNew}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-fuchsia-500 text-white rounded-xl hover:opacity-90 transition-opacity font-medium shadow-sm"
-        >
-          <Plus className="w-5 h-5" />
-          สร้างเอกสารใหม่
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImport}
+            accept=".xlsx, .xls, .csv"
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors font-medium shadow-sm"
+          >
+            <Upload className="w-5 h-5" />
+            นำเข้า Excel
+          </button>
+          <button
+            onClick={handleExport}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors font-medium shadow-sm"
+          >
+            <Download className="w-5 h-5" />
+            ส่งออก Excel
+          </button>
+          <button 
+            onClick={handleCreateNew}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-fuchsia-500 text-white rounded-xl hover:opacity-90 transition-opacity font-medium shadow-sm"
+          >
+            <Plus className="w-5 h-5" />
+            สร้างเอกสารใหม่
+          </button>
+        </div>
       </div>
 
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col sm:flex-row gap-4">

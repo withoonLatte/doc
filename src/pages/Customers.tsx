@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useStore } from '../store';
-import { Plus, Search, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Download, Upload } from 'lucide-react';
 import { Customer } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { exportToExcel, importFromExcel } from '../services/excelService';
 
 export default function Customers() {
   const { customers, addCustomer, updateCustomer, deleteCustomer } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<Partial<Customer>>({
     name: '',
@@ -41,6 +43,42 @@ export default function Customers() {
     setEditingCustomer(null);
   };
 
+  const handleExport = () => {
+    // Prepare data for export (remove internal fields if necessary)
+    const exportData = customers.map(({ id, ...rest }) => ({
+      ...rest
+    }));
+    exportToExcel(exportData, 'customers_list');
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const data = await importFromExcel(file);
+        let count = 0;
+        data.forEach((item: any) => {
+          if (item.name) {
+            addCustomer({
+              id: crypto.randomUUID(),
+              name: String(item.name),
+              address: String(item.address || ''),
+              taxId: String(item.taxId || ''),
+              phone: String(item.phone || ''),
+              email: String(item.email || ''),
+            });
+            count++;
+          }
+        });
+        alert(`นำเข้าข้อมูลลูกค้าสำเร็จ ${count} รายการ`);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      } catch (error) {
+        console.error('Import error:', error);
+        alert('เกิดข้อผิดพลาดในการนำเข้าข้อมูล กรุณาตรวจสอบรูปแบบไฟล์');
+      }
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingCustomer) {
@@ -58,13 +96,36 @@ export default function Customers() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold text-slate-800">จัดการลูกค้า</h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-fuchsia-500 text-white px-4 py-2 rounded-xl hover:opacity-90 transition-opacity shadow-sm"
-        >
-          <Plus className="w-5 h-5" />
-          <span>เพิ่มลูกค้าใหม่</span>
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImport}
+            accept=".xlsx, .xls, .csv"
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
+          >
+            <Upload className="w-5 h-5" />
+            <span>นำเข้า Excel</span>
+          </button>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
+          >
+            <Download className="w-5 h-5" />
+            <span>ส่งออก Excel</span>
+          </button>
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-fuchsia-500 text-white px-4 py-2 rounded-xl hover:opacity-90 transition-opacity shadow-sm"
+          >
+            <Plus className="w-5 h-5" />
+            <span>เพิ่มลูกค้าใหม่</span>
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
